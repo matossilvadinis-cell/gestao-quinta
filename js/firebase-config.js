@@ -1,18 +1,13 @@
 // firebase-config.js — configuração do projeto Firebase
 //
-// Enquanto for null, a app funciona em modo local (dados só neste browser).
-// Para ativar a partilha em tempo real, cola aqui a configuração do teu
-// projeto (Consola Firebase → Definições do projeto → As tuas apps → Config):
-//
-// window.FIREBASE_CONFIG = {
-//   apiKey: "...",
-//   authDomain: "....firebaseapp.com",
-//   projectId: "...",
-//   storageBucket: "....appspot.com",
-//   messagingSenderId: "...",
-//   appId: "..."
-// };
-//
-// Nota: esta configuração NÃO é secreta — pode ser publicada no GitHub.
+// Esta configuração NÃO é secreta — pode ser publicada no GitHub.
 // A proteção dos dados é feita pelas regras do Firestore + código da quinta.
-window.FIREBASE_CONFIG = null;
+window.FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDOfX6_G-vrAbfjb5b2sIb-Mjmj5JYsCFU",
+  authDomain: "gestao-quinta.firebaseapp.com",
+  projectId: "gestao-quinta",
+  storageBucket: "gestao-quinta.firebasestorage.app",
+  messagingSenderId: "1030911094540",
+  appId: "1:1030911094540:web:e91b7d1de9c80c424f6329",
+  measurementId: "G-9WZ1GTQXR3"
+};
