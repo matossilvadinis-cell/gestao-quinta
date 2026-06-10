@@ -32,6 +32,14 @@
         const lider = trabalhadorPorId(g.liderId);
         const lotes = regsDia.filter(function(r){ return r.grupoId === g.id; });
         const totGrupo = totaisProducao(lotes);
+        const pres = presentesDoGrupo(g.id, dataSel);
+        const media = pres.equivalente > 0 ? totGrupo.kg / pres.equivalente : null;
+        const linhaMedia = '<div class="resumo-chips">' +
+          '<span class="chip">👥 ' + fmtDias(pres.equivalente) + ' presentes no dia' +
+            (pres.meios ? ' (' + fmtNum(pres.meios) + ' a meio-dia)' : '') + '</span>' +
+          '<span class="chip ' + (media != null ? 'chip-verde' : '') + '">📊 Média: ' +
+            (media != null ? fmtNum(media) + ' kg/pessoa' : '—') + '</span>' +
+        '</div>';
 
         const linhasLotes = lotes.length === 0
           ? '<div class="vazio">Sem lotes registados neste dia.</div>'
@@ -54,6 +62,7 @@
           '<h3>👥 ' + esc(g.nome) +
             ' <span class="suave">— líder: ' + esc(lider ? lider.nome : '—') +
             ' · ' + fmtNum(g.membroIds.length) + ' trabalhador(es)</span></h3>' +
+          linhaMedia +
           linhasLotes +
           '<div class="linha-form" style="margin-top:10px">' +
             '<div class="campo"><label>Pomar</label><select data-grupo-pomar="' + g.id + '">' + opcoesPomar + '</select></div>' +
@@ -90,6 +99,7 @@
           '<span class="dia-semana">' + nomeDiaSemana(dataSel) + '</span>' +
           '<span style="flex:1"></span>' +
           '<button class="btn btn-pq" id="hoje-btn">Hoje</button>' +
+          '<button class="btn btn-sec btn-pq" id="pdf-dia">📄 Resumo do dia (PDF)</button>' +
         '</div>' +
         '<div class="resumo-chips">' +
           '<span class="chip chip-verde">Total do dia: ' + fmtNum(totDia.palotes) + ' palotes · ' + fmtKg(totDia.kg) + '</span>' +
@@ -107,6 +117,7 @@
     el.querySelector('#dia-ant').addEventListener('click', function(){ dataSel = somarDias(dataSel, -1); rerender(); });
     el.querySelector('#dia-seg').addEventListener('click', function(){ dataSel = somarDias(dataSel, 1); rerender(); });
     el.querySelector('#hoje-btn').addEventListener('click', function(){ dataSel = hojeISO(); rerender(); });
+    el.querySelector('#pdf-dia').addEventListener('click', function(){ gerarResumoDiarioPDF(dataSel); });
     el.querySelector('#data-producao').addEventListener('change', function(ev){
       dataSel = ev.target.value || hojeISO();
       rerender();

@@ -46,10 +46,40 @@
         '</tbody><tfoot><tr><td colspan="6">Total geral da semana</td>' +
         '<td class="num">' + fmtEuro(res.totalGeral) + '</td></tr></tfoot></table></div>';
 
+    // ----- Caixa -----
+    const caixa = caixaDaTemporada();
+    const proximo = proximoPagamentoInfo();
+    const diferenca = (caixa.valor || 0) - proximo.total;
+    let estadoCaixa;
+    if (proximo.total === 0) {
+      estadoCaixa = '<div class="aviso aviso-info">ℹ️ Ainda não há presenças registadas esta semana — o total a pagar é 0 €.</div>';
+    } else if (diferenca >= 0) {
+      estadoCaixa = '<div class="aviso aviso-ok">✅ <strong>Dinheiro suficiente.</strong> Após o pagamento de ' +
+        fmtEuro(proximo.total) + ' sobram <strong>' + fmtEuro(diferenca) + '</strong> em caixa.</div>';
+    } else {
+      estadoCaixa = '<div class="aviso aviso-erro">❌ <strong>Dinheiro insuficiente!</strong> Faltam <strong>' +
+        fmtEuro(-diferenca) + '</strong> para pagar os ' + fmtEuro(proximo.total) + ' de sábado.</div>';
+    }
+    const cartaoCaixa =
+      '<div class="cartao"><h3>💰 Caixa</h3>' +
+        '<div class="linha-form">' +
+          '<div class="campo"><label>Dinheiro disponível em caixa (€)</label>' +
+            '<input type="number" min="0" step="0.01" id="caixa-valor" value="' + (caixa.valor || '') + '" placeholder="0,00"></div>' +
+          '<button class="btn" id="guardar-caixa">Atualizar caixa</button>' +
+          (caixa.atualizadoEm
+            ? '<span class="suave">Última atualização: ' + formatarData(caixa.atualizadoEm) + '</span>'
+            : '') +
+        '</div>' +
+        '<p>Próximo pagamento: <strong>' + nomeDiaSemana(proximo.sabado) + ', ' + formatarData(proximo.sabado) +
+          '</strong> — total previsto com as presenças desta semana: <strong>' + fmtEuro(proximo.total) + '</strong></p>' +
+        estadoCaixa +
+      '</div>';
+
     el.innerHTML =
       '<div class="cabecalho-vista"><h2>💶 Salários semanais</h2></div>' +
 
       avisoValores +
+      cartaoCaixa +
 
       '<div class="cartao">' +
         '<div class="linha-form">' +
@@ -70,6 +100,17 @@
 
     el.querySelectorAll('[data-nav]').forEach(function(b){
       b.addEventListener('click', function(){ navegar(b.dataset.nav); });
+    });
+
+    el.querySelector('#guardar-caixa').addEventListener('click', function(){
+      const v = parseFloat(String(el.querySelector('#caixa-valor').value).replace(',', '.'));
+      if (isNaN(v) || v < 0) { toast('Indique um valor válido (≥ 0).', 'erro'); return; }
+      const cx = caixaDaTemporada();
+      cx.valor = v;
+      cx.atualizadoEm = hojeISO();
+      guardarDB();
+      toast('Caixa atualizada: ' + fmtEuro(v) + '.');
+      rerender();
     });
 
     el.querySelector('#sel-semana').addEventListener('change', function(ev){

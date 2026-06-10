@@ -159,6 +159,7 @@ h3{ font-size:1.05rem; }
 .aviso-info{ background:var(--azul-claro); border:1px solid #bbdefb; }
 .aviso-ok{ background:var(--verde-claro); border:1px solid #c8e6c9; }
 .aviso-atencao{ background:var(--laranja-claro); border:1px solid #ffe0b2; }
+.aviso-erro{ background:var(--vermelho-claro); border:1px solid #ffcdd2; color:var(--vermelho); }
 .vazio{
   color:var(--texto-suave);
   font-style:italic;

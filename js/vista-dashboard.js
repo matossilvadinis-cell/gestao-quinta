@@ -125,6 +125,14 @@
         '<div class="cartao"><h3>💶 Próximo pagamento salarial</h3>' +
           '<p><strong>' + nomeDiaSemana(sab) + ', ' + formatarData(sab) + '</strong></p>' +
           '<p>Estimativa com as presenças registadas até agora: <strong>' + fmtEuro(salSemana.totalGeral) + '</strong></p>' +
+          (function(){
+            const cx = caixaDaTemporada();
+            if (!cx.valor) return '';
+            const dif = cx.valor - salSemana.totalGeral;
+            return dif >= 0
+              ? '<p>💰 Em caixa: ' + fmtEuro(cx.valor) + ' — <span class="badge badge-pago">sobram ' + fmtEuro(dif) + '</span></p>'
+              : '<p>💰 Em caixa: ' + fmtEuro(cx.valor) + ' — <span class="badge badge-maca">faltam ' + fmtEuro(-dif) + '</span></p>';
+          })() +
           '<div class="resumo-chips">' +
             '<span class="chip chip-verde">' + fmtNum(resumo.presentes) + ' presentes hoje</span>' +
             (resumo.meios ? '<span class="chip chip-laranja">' + fmtNum(resumo.meios) + ' meio-dia</span>' : '') +

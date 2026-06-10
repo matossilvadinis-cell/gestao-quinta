@@ -32,7 +32,8 @@ function novaTemporada(ano, base){
     grupos: [],                 // { id, nome, liderId, membroIds: [] }
     producao: [],               // { id, data, grupoId, grupoNome, pomarId, palotes }
     entregas: [],               // { id, data, pomarId, palotes }
-    pagamentos: {}              // { inicioSemana: { pago:true, em:'AAAA-MM-DD' } }
+    pagamentos: {},             // { inicioSemana: { pago:true, em:'AAAA-MM-DD' } }
+    caixa: { valor: 0, atualizadoEm: null }
   };
 }
 
@@ -191,6 +192,20 @@ function diasTemporadaTrabalhador(trabId){
   return { completos: completos, meios: meios };
 }
 
+// Presenças dos elementos de um grupo (líder + trabalhadores) num dia
+function presentesDoGrupo(grupoId, data){
+  const g = grupoPorId(grupoId);
+  if (!g) return { completos: 0, meios: 0, equivalente: 0 };
+  const reg = temporada().chamadas[data] || {};
+  const ids = (g.liderId ? [g.liderId] : []).concat(g.membroIds);
+  let completos = 0, meios = 0;
+  ids.forEach(function(id){
+    if (reg[id] === 'P') completos++;
+    else if (reg[id] === 'M') meios++;
+  });
+  return { completos: completos, meios: meios, equivalente: completos + meios * 0.5 };
+}
+
 function trabalhadorTemRegistos(trabId){
   const t = temporada();
   return Object.keys(t.chamadas).some(function(d){ return t.chamadas[d][trabId] != null; });
@@ -239,18 +254,22 @@ function agruparProducaoPorPomar(regs){
 
 /* ===== Stock de palotes ===== */
 
-function stockPorVariedade(){
+// Stock por variedade; com `ateData` considera apenas registos até esse dia (inclusive)
+function stockPorVariedade(ateData){
   const t = temporada();
+  const limite = ateData || '9999-12-31';
   const mapa = {};
   function entrada(v){
     if (!mapa[v.id]) mapa[v.id] = { variedade: v, colhidos: 0, entregues: 0 };
     return mapa[v.id];
   }
   t.producao.forEach(function(r){
+    if (r.data > limite) return;
     const v = variedadeDoPomar(r.pomarId);
     if (v) entrada(v).colhidos += r.palotes;
   });
   t.entregas.forEach(function(e){
+    if (e.data > limite) return;
     const v = variedadeDoPomar(e.pomarId);
     if (v) entrada(v).entregues += e.palotes;
   });
@@ -288,6 +307,31 @@ function semanasDaTemporada(){
   return Array.from(conjunto).sort().reverse();
 }
 
+// Valor diário do trabalhador: usa o valor personalizado ("da casa") se definido
+function valorDiarioDoTrabalhador(tr){
+  if (tr.valorDiarioProprio != null && tr.valorDiarioProprio !== '' && !isNaN(tr.valorDiarioProprio)) {
+    return Number(tr.valorDiarioProprio);
+  }
+  const c = temporada().config;
+  return tr.tipo === 'lider' ? (c.valorDiarioLider || 0) : (c.valorDiarioTrabalhador || 0);
+}
+
+// Caixa da temporada (com migração de dados antigos sem o campo)
+function caixaDaTemporada(){
+  const t = temporada();
+  if (!t.caixa) t.caixa = { valor: 0, atualizadoEm: null };
+  return t.caixa;
+}
+
+// Próximo pagamento: sábado desta semana (ou da próxima, se já passou)
+function proximoPagamentoInfo(){
+  const hoje = hojeISO();
+  let sab = sabadoDaSemana(hoje);
+  if (hoje > sab) sab = somarDias(sab, 7);
+  const inicio = inicioSemana(sab);
+  return { sabado: sab, inicio: inicio, total: calcularSalariosSemana(inicio).totalGeral };
+}
+
 function calcularSalariosSemana(inicio){
   const t = temporada();
   const linhas = [];
@@ -296,7 +340,7 @@ function calcularSalariosSemana(inicio){
     const d = diasSemanaTrabalhador(tr.id, inicio);
     const diasPagos = d.completos + d.meios * 0.5;
     if (diasPagos === 0 && tr.ativo === false) return;
-    const valorDia = tr.tipo === 'lider' ? (t.config.valorDiarioLider || 0) : (t.config.valorDiarioTrabalhador || 0);
+    const valorDia = valorDiarioDoTrabalhador(tr);
     const total = diasPagos * valorDia;
     totalGeral += total;
     linhas.push({

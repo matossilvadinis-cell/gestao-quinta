@@ -90,6 +90,36 @@ verificar('Carlos (líder): 2 dias × 75€ = 150€', linhaCarlos.total === 150
 verificar('total geral = 300€', sal.totalGeral === 300);
 verificar('semana aparece na lista de semanas', semanasDaTemporada().indexOf(seg) !== -1);
 
+print('— Média de kg por pessoa no grupo —');
+// seg: w1=P, w2=M, w3(líder)=P → 2,5 pessoas equivalentes; produção do dia = 1840 kg
+var presG = presentesDoGrupo('g1', seg);
+verificar('presenças do grupo: 2 completos + 1 meio = 2,5 equivalentes',
+  presG.completos === 2 && presG.meios === 1 && presG.equivalente === 2.5);
+var kgGrupoSeg = totaisProducao(t.producao.filter(function(r){ return r.data === seg && r.grupoId === 'g1'; })).kg;
+verificar('média do grupo = 1840 ÷ 2,5 = 736 kg/pessoa', kgGrupoSeg / presG.equivalente === 736);
+
+print('— Trabalhador da casa (valor diário próprio) —');
+t.trabalhadores.push({ id: 'w4', nome: 'Dona da Casa', tipo: 'trabalhador', repetido: false, ativo: true, valorDiarioProprio: 50 });
+definirChamada(seg, 'w4', 'P');
+verificar('valor diário usa o personalizado (50€, não 60€)', valorDiarioDoTrabalhador(trabalhadorPorId('w4')) === 50);
+var sal2 = calcularSalariosSemana(seg);
+var linhaCasa = sal2.linhas.find(function(l){ return l.trabalhador.id === 'w4'; });
+verificar('salário da semana: 1 dia × 50€ = 50€', linhaCasa.total === 50);
+verificar('total geral passa a 350€ (300 + 50)', sal2.totalGeral === 350);
+
+print('— Caixa —');
+var cx = caixaDaTemporada();
+verificar('caixa começa a 0 (com migração automática)', cx.valor === 0);
+cx.valor = 400; cx.atualizadoEm = seg; guardarDB();
+verificar('caixa 400€ vs 350€ a pagar → sobram 50€', caixaDaTemporada().valor - sal2.totalGeral === 50);
+
+print('— Stock até um dia —');
+// produção em seg (4 pera + 3 maçã); entrega de 3 peras em ter
+var stockSeg = stockPorVariedade(seg).find(function(s){ return s.variedade.id === peraRocha.id; });
+var stockTer = stockPorVariedade(ter).find(function(s){ return s.variedade.id === peraRocha.id; });
+verificar('stock de pera no fim de segunda = 4 (entrega ainda não aconteceu)', stockSeg.stock === 4);
+verificar('stock de pera no fim de terça = 1 (após entrega de 3)', stockTer.stock === 1);
+
 print('— Fecho de temporada e reconhecimento de repetidos —');
 var anoAtual = t.ano;
 fecharTemporadaAtual();

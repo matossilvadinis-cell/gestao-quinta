@@ -25,19 +25,24 @@
     const linhasTrabs = trabs.length === 0
       ? '<div class="vazio">Ainda não há trabalhadores registados.</div>'
       : '<div class="tabela-envolver"><table class="tabela"><thead><tr>' +
-        '<th>Nome</th><th>Tipo</th><th>Origem</th><th class="num">Dias nesta temporada</th><th>Ativo</th><th></th></tr></thead><tbody>' +
+        '<th>Nome</th><th>Tipo</th><th>Origem</th><th class="num">€/dia próprio</th><th class="num">Dias nesta temporada</th><th>Ativo</th><th></th></tr></thead><tbody>' +
         trabs.map(function(tr){
           const d = diasTemporadaTrabalhador(tr.id);
           const dias = d.completos + d.meios * 0.5;
           const inativo = tr.ativo === false;
+          const temProprio = tr.valorDiarioProprio != null && tr.valorDiarioProprio !== '';
           return '<tr' + (inativo ? ' class="linha-inativa"' : '') + '>' +
-            '<td>' + esc(tr.nome) + '</td>' +
+            '<td>' + esc(tr.nome) +
+              (temProprio ? ' <span class="badge badge-pago" title="Valor diário personalizado">€ próprio</span>' : '') + '</td>' +
             '<td><select data-tipo="' + tr.id + '">' +
               '<option value="trabalhador"' + (tr.tipo === 'trabalhador' ? ' selected' : '') + '>Trabalhador</option>' +
               '<option value="lider"' + (tr.tipo === 'lider' ? ' selected' : '') + '>Líder</option>' +
             '</select></td>' +
             '<td><span class="badge ' + (tr.repetido ? 'badge-repetido' : 'badge-novo') + '">' +
               (tr.repetido ? 'Repetido' : 'Novo') + '</span></td>' +
+            '<td class="num"><input type="number" min="0" step="0.5" data-valor-proprio="' + tr.id +
+              '" value="' + (temProprio ? tr.valorDiarioProprio : '') + '" placeholder="geral" style="width:90px" ' +
+              'title="Vazio = usa o valor geral da temporada (' + fmtEuro(valorDiarioDoTrabalhador({ tipo: tr.tipo })) + ')"></td>' +
             '<td class="num">' + fmtDias(dias) + '</td>' +
             '<td><input type="checkbox" data-ativo="' + tr.id + '"' + (inativo ? '' : ' checked') + '></td>' +
             '<td class="texto-direita">' +
@@ -68,6 +73,8 @@
             '<option value="trabalhador">Trabalhador</option>' +
             '<option value="lider">Líder de grupo</option>' +
           '</select></div>' +
+          '<div class="campo"><label>€/dia próprio (opcional)</label>' +
+            '<input type="number" min="0" step="0.5" id="novo-valor-proprio" placeholder="usa o geral"></div>' +
           '<button class="btn" id="adicionar-trab">Adicionar</button>' +
         '</div>' +
         '<div id="info-historico"></div>' +
@@ -116,12 +123,19 @@
         return;
       }
       const hist = procurarHistoricoTrabalhador(nome);
+      const vpTexto = String(el.querySelector('#novo-valor-proprio').value).replace(',', '.');
+      const vp = vpTexto.trim() === '' ? null : parseFloat(vpTexto);
+      if (vp != null && (isNaN(vp) || vp < 0)) {
+        toast('Valor diário próprio inválido.', 'erro');
+        return;
+      }
       temporada().trabalhadores.push({
         id: uid(),
         nome: nome,
         tipo: tipo,
         repetido: !!hist,
-        ativo: true
+        ativo: true,
+        valorDiarioProprio: vp
       });
       guardarDB();
       toast(hist
@@ -138,6 +152,27 @@
         tr.tipo = sel.value;
         guardarDB();
         toast('Tipo de ' + tr.nome + ' atualizado.');
+        rerender();
+      });
+    });
+
+    // Valor diário personalizado ("trabalhador da casa")
+    el.querySelectorAll('input[data-valor-proprio]').forEach(function(inp){
+      inp.addEventListener('change', function(){
+        const tr = trabalhadorPorId(inp.dataset.valorProprio);
+        if (!tr) return;
+        const texto = String(inp.value).replace(',', '.').trim();
+        if (texto === '') {
+          tr.valorDiarioProprio = null;
+          guardarDB();
+          toast(tr.nome + ' volta a usar o valor geral da temporada.');
+        } else {
+          const v = parseFloat(texto);
+          if (isNaN(v) || v < 0) { toast('Valor inválido.', 'erro'); rerender(); return; }
+          tr.valorDiarioProprio = v;
+          guardarDB();
+          toast(tr.nome + ': valor diário próprio de ' + fmtEuro(v) + '.');
+        }
         rerender();
       });
     });

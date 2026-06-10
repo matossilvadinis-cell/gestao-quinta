@@ -119,6 +119,15 @@
         '<div class="cartao"><h3>🧺 Produção semanal</h3>' +
           '<p>Kg e palotes por variedade e por pomar, total da semana e acumulado da temporada.</p>' +
           '<button class="btn" id="exp-producao">📥 Descarregar relatório de produção</button></div>' +
+      '</div>' +
+
+      '<div class="cartao"><h3>📄 Resumo diário (PDF)</h3>' +
+        '<p>Presenças do dia (diretos e empresas), produção por grupo com média de kg por pessoa, ' +
+        'totais por variedade e stock de palotes após o dia.</p>' +
+        '<div class="linha-form">' +
+          '<div class="campo"><label>Dia</label><input type="date" id="pdf-data" value="' + hojeISO() + '"></div>' +
+          '<button class="btn" id="exp-pdf">📥 Descarregar resumo do dia</button>' +
+        '</div>' +
       '</div>';
 
     el.querySelector('#sel-semana-exp').addEventListener('change', function(ev){
@@ -129,6 +138,10 @@
     });
     el.querySelector('#exp-producao').addEventListener('click', function(){
       exportarProducao(semanaSel);
+    });
+    el.querySelector('#exp-pdf').addEventListener('click', function(){
+      const data = el.querySelector('#pdf-data').value || hojeISO();
+      gerarResumoDiarioPDF(data);
     });
   }
 

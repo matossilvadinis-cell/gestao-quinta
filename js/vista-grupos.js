@@ -37,6 +37,11 @@
       : t.grupos.map(function(g){
         const lider = trabalhadorPorId(g.liderId);
         const membros = g.membroIds.map(trabalhadorPorId).filter(Boolean);
+        const hoje = hojeISO();
+        const lotesHoje = t.producao.filter(function(r){ return r.data === hoje && r.grupoId === g.id; });
+        const totHoje = totaisProducao(lotesHoje);
+        const presHoje = presentesDoGrupo(g.id, hoje);
+        const mediaHoje = presHoje.equivalente > 0 ? totHoje.kg / presHoje.equivalente : null;
         const opLideres = lideresDisponiveis(g.id).map(function(l){
           return '<option value="' + l.id + '"' + (l.id === g.liderId ? ' selected' : '') + '>' + esc(l.nome) + '</option>';
         }).join('');
@@ -49,6 +54,12 @@
             '<h3 class="mt0">👥 ' + esc(g.nome) + '</h3>' +
             '<div><button class="btn btn-sec btn-pq" data-renomear="' + g.id + '">✏️ Renomear</button> ' +
             '<button class="btn btn-perigo btn-pq" data-eliminar="' + g.id + '">Eliminar grupo</button></div>' +
+          '</div>' +
+          '<div class="resumo-chips">' +
+            '<span class="chip">Hoje: ' + fmtNum(totHoje.palotes) + ' palotes · ' + fmtKg(totHoje.kg) + '</span>' +
+            '<span class="chip">👥 ' + fmtDias(presHoje.equivalente) + ' presentes</span>' +
+            '<span class="chip ' + (mediaHoje != null ? 'chip-verde' : '') + '">📊 Média: ' +
+              (mediaHoje != null ? fmtNum(mediaHoje) + ' kg/pessoa' : '—') + '</span>' +
           '</div>' +
           '<div class="linha-form">' +
             '<div class="campo"><label>Líder</label>' +

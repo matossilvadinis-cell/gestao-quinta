@@ -33,7 +33,9 @@ var Nuvem = (function(){
   function jsonEstavel(v){
     if (v === null || typeof v !== 'object') return JSON.stringify(v);
     if (Array.isArray(v)) return '[' + v.map(jsonEstavel).join(',') + ']';
-    return '{' + Object.keys(v).sort().map(function(k){
+    return '{' + Object.keys(v).sort().filter(function(k){
+      return v[k] !== undefined;
+    }).map(function(k){
       return JSON.stringify(k) + ':' + jsonEstavel(v[k]);
     }).join(',') + '}';
   }
