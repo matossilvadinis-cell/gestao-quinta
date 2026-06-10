@@ -60,6 +60,22 @@ h3{ font-size:1.05rem; }
   padding:3px 10px;
   border-radius:99px;
 }
+.chip-nuvem{
+  font-family:inherit;
+  font-size:.72rem;
+  font-weight:700;
+  padding:3px 10px;
+  border-radius:99px;
+  border:none;
+  cursor:pointer;
+  background:rgba(255,255,255,.18);
+  color:#fff;
+}
+.chip-nuvem:hover{ background:rgba(255,255,255,.3); }
+.chip-nuvem.nuvem-ok{ background:rgba(129,199,132,.35); }
+.chip-nuvem.nuvem-atencao{ background:rgba(255,183,77,.4); }
+.chip-nuvem.nuvem-erro{ background:rgba(239,83,80,.5); }
+.chip-nuvem.nuvem-local{ background:rgba(255,255,255,.18); }
 .nav{
   display:flex;
   gap:4px;

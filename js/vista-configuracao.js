@@ -115,6 +115,15 @@
         '<p class="suave">A nova temporada herda valores diários, variedades, pomares e empresas. Os trabalhadores registam-se de novo (com reconhecimento automático dos repetidos).</p>' +
       '</div>' +
 
+      '<div class="cartao"><h3>☁️ Partilha de dados (nuvem)</h3>' +
+        (typeof Nuvem !== 'undefined' && Nuvem.disponivel()
+          ? (Nuvem.obterQuintaId()
+              ? '<p>Este computador está ligado à quinta <code>' + esc(Nuvem.obterQuintaId()) + '</code> — os dados são partilhados em tempo real com quem tiver este código.</p>'
+              : '<p>O Firebase está configurado mas este computador ainda não está ligado a nenhuma quinta.</p>') +
+            '<button class="btn btn-sec" id="gerir-nuvem">Gerir partilha</button>'
+          : '<p class="suave">Partilha em tempo real não configurada (js/firebase-config.js). Os dados ficam apenas neste browser.</p>') +
+      '</div>' +
+
       '<div class="cartao"><h3>💾 Cópia de segurança</h3>' +
         '<div class="linha-form">' +
           '<button class="btn btn-sec" id="exportar-backup">📥 Descarregar cópia (JSON)</button>' +
@@ -303,9 +312,19 @@
       leitor.readAsText(f);
     });
 
+    const naNuvem = typeof Nuvem !== 'undefined' && Nuvem.disponivel() && Nuvem.obterQuintaId();
+    const btnGerirNuvem = el.querySelector('#gerir-nuvem');
+    if (btnGerirNuvem) {
+      btnGerirNuvem.addEventListener('click', function(){ mostrarConfigQuinta(); });
+    }
+
     el.querySelector('#apagar-tudo').addEventListener('click', function(){
-      if (!confirm('Apagar TODOS os dados da aplicação (todas as temporadas e históricos)?')) return;
+      const aviso = naNuvem
+        ? 'Apagar TODOS os dados da aplicação (todas as temporadas e históricos)?\n\nATENÇÃO: a quinta está sincronizada — os dados serão apagados em TODOS os dispositivos ligados.'
+        : 'Apagar TODOS os dados da aplicação (todas as temporadas e históricos)?';
+      if (!confirm(aviso)) return;
       if (!confirm('Tem mesmo a certeza? Esta ação não pode ser desfeita.')) return;
+      if (naNuvem) Nuvem.apagarTudoNuvem();
       localStorage.removeItem(CHAVE_DB);
       DB = null;
       carregarDB();

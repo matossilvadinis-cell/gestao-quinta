@@ -60,6 +60,8 @@ function carregarDB(){
 
 function guardarDB(){
   localStorage.setItem(CHAVE_DB, JSON.stringify(DB));
+  // Sincronização na nuvem (se configurada) — ver js/nuvem.js
+  if (typeof Nuvem !== 'undefined' && Nuvem.disponivel()) Nuvem.guardar(DB);
 }
 
 function temporada(){

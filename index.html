@@ -9,7 +9,7 @@
 <body>
 <header class="topo">
   <div class="topo-interior">
-    <div class="marca">🍐 <span class="marca-nome">Gestão da Quinta</span> <span class="badge-temporada" id="badge-temporada"></span></div>
+    <div class="marca">🍐 <span class="marca-nome">Gestão da Quinta</span> <span class="badge-temporada" id="badge-temporada"></span> <button type="button" class="chip-nuvem" id="chip-nuvem" title="Estado da sincronização"></button></div>
     <nav class="nav" id="nav"></nav>
   </div>
 </header>
@@ -17,7 +17,12 @@
 <div id="raiz-modal"></div>
 <div id="raiz-toast" class="raiz-toast"></div>
 
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/nuvem.js"></script>
 <script src="js/dados.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/vista-dashboard.js"></script>
