@@ -137,73 +137,123 @@ function empresaReferenciada(empId){
   return Object.keys(re).some(function(d){ return re[d][empId] != null; });
 }
 
-/* ===== Chamada ===== */
+/* ===== Chamada (registo por horas; compatível com o formato antigo 'P'/'M'/'A') ===== */
 
-function estadoChamada(data, trabId){
-  const reg = temporada().chamadas[data];
-  return reg ? (reg[trabId] || null) : null;
+const HORAS_DIA_COMPLETO = 8;
+
+// Converte qualquer formato guardado para { horas, grupoId }
+function normalizarRegistoChamada(v){
+  if (v == null) return null;
+  if (typeof v === 'string') {
+    if (v === 'P') return { horas: HORAS_DIA_COMPLETO, grupoId: null };
+    if (v === 'M') return { horas: HORAS_DIA_COMPLETO / 2, grupoId: null };
+    return { horas: 0, grupoId: null }; // 'A'
+  }
+  return {
+    horas: (typeof v.horas === 'number' && !isNaN(v.horas)) ? v.horas : 0,
+    grupoId: v.grupoId || null
+  };
 }
 
-function definirChamada(data, trabId, estado){
+function registoChamada(data, trabId){
+  const reg = temporada().chamadas[data];
+  return reg ? normalizarRegistoChamada(reg[trabId]) : null;
+}
+
+// registo: { horas, grupoId } ou null para limpar
+function definirChamada(data, trabId, registo){
   const t = temporada();
   if (!t.chamadas[data]) t.chamadas[data] = {};
-  if (estado) t.chamadas[data][trabId] = estado;
-  else delete t.chamadas[data][trabId];
+  if (registo) {
+    t.chamadas[data][trabId] = {
+      horas: Math.max(0, Number(registo.horas) || 0),
+      grupoId: registo.grupoId || null
+    };
+  } else {
+    delete t.chamadas[data][trabId];
+  }
   if (Object.keys(t.chamadas[data]).length === 0) delete t.chamadas[data];
   guardarDB();
 }
 
 function resumoChamadaDia(data){
   const t = temporada();
-  const reg = t.chamadas[data] || {};
-  let presentes = 0, meios = 0, ausentes = 0, semRegisto = 0;
+  let completos = 0, parciais = 0, ausentes = 0, semRegisto = 0, horasTotais = 0;
   trabalhadoresAtivos().forEach(function(tr){
-    if (reg[tr.id] === 'P') presentes++;
-    else if (reg[tr.id] === 'M') meios++;
-    else if (reg[tr.id] === 'A') ausentes++;
-    else semRegisto++;
+    const r = registoChamada(data, tr.id);
+    if (!r) { semRegisto++; return; }
+    if (r.horas >= HORAS_DIA_COMPLETO) { completos++; horasTotais += r.horas; }
+    else if (r.horas > 0) { parciais++; horasTotais += r.horas; }
+    else ausentes++;
   });
   let externos = 0;
   const re = t.registoEmpresas[data] || {};
   Object.keys(re).forEach(function(k){ externos += parseInt(re[k], 10) || 0; });
-  return { presentes: presentes, meios: meios, ausentes: ausentes, semRegisto: semRegisto, externos: externos };
+  return {
+    completos: completos, parciais: parciais, presentes: completos + parciais,
+    ausentes: ausentes, semRegisto: semRegisto,
+    horasTotais: horasTotais, externos: externos
+  };
 }
 
-function diasSemanaTrabalhador(trabId, inicio){
-  const t = temporada();
-  let completos = 0, meios = 0;
+function horasSemanaTrabalhador(trabId, inicio){
+  let horas = 0;
   for (let i = 0; i < 7; i++) {
-    const reg = t.chamadas[somarDias(inicio, i)];
-    if (!reg) continue;
-    if (reg[trabId] === 'P') completos++;
-    else if (reg[trabId] === 'M') meios++;
+    const r = registoChamada(somarDias(inicio, i), trabId);
+    if (r) horas += r.horas;
   }
-  return { completos: completos, meios: meios };
+  return horas;
 }
 
-function diasTemporadaTrabalhador(trabId){
+function horasTemporadaTrabalhador(trabId){
   const t = temporada();
-  let completos = 0, meios = 0;
+  let horas = 0;
   Object.keys(t.chamadas).forEach(function(d){
-    const e = t.chamadas[d][trabId];
-    if (e === 'P') completos++;
-    else if (e === 'M') meios++;
+    const r = normalizarRegistoChamada(t.chamadas[d][trabId]);
+    if (r) horas += r.horas;
   });
-  return { completos: completos, meios: meios };
+  return horas;
 }
 
-// Presenças dos elementos de um grupo (líder + trabalhadores) num dia
+// Grupo a que o trabalhador pertence num dia: o líder é fixo ao seu grupo;
+// os restantes ficam com o grupo escolhido na chamada desse dia
+function grupoDoTrabalhadorNoDia(trabId, data){
+  const t = temporada();
+  const lidera = t.grupos.find(function(g){ return g.liderId === trabId; });
+  if (lidera) return lidera.id;
+  const r = registoChamada(data, trabId);
+  return r ? r.grupoId : null;
+}
+
+// Pessoas e horas do grupo num dia (via chamada); equivalente = horas ÷ 8
 function presentesDoGrupo(grupoId, data){
-  const g = grupoPorId(grupoId);
-  if (!g) return { completos: 0, meios: 0, equivalente: 0 };
-  const reg = temporada().chamadas[data] || {};
-  const ids = (g.liderId ? [g.liderId] : []).concat(g.membroIds);
-  let completos = 0, meios = 0;
-  ids.forEach(function(id){
-    if (reg[id] === 'P') completos++;
-    else if (reg[id] === 'M') meios++;
+  const t = temporada();
+  const reg = t.chamadas[data] || {};
+  let pessoas = 0, horas = 0;
+  Object.keys(reg).forEach(function(id){
+    const r = normalizarRegistoChamada(reg[id]);
+    if (!r || r.horas <= 0) return;
+    if (grupoDoTrabalhadorNoDia(id, data) !== grupoId) return;
+    pessoas++;
+    horas += r.horas;
   });
-  return { completos: completos, meios: meios, equivalente: completos + meios * 0.5 };
+  return { pessoas: pessoas, horas: horas, equivalente: horas / HORAS_DIA_COMPLETO };
+}
+
+// Composição do grupo num dia, para listagem
+function composicaoDoGrupoNoDia(grupoId, data){
+  const t = temporada();
+  const reg = t.chamadas[data] || {};
+  const lista = [];
+  Object.keys(reg).forEach(function(id){
+    const r = normalizarRegistoChamada(reg[id]);
+    if (!r || r.horas <= 0) return;
+    if (grupoDoTrabalhadorNoDia(id, data) !== grupoId) return;
+    const tr = trabalhadorPorId(id);
+    if (tr) lista.push({ trabalhador: tr, horas: r.horas });
+  });
+  lista.sort(function(a, b){ return a.trabalhador.nome.localeCompare(b.trabalhador.nome, 'pt'); });
+  return lista;
 }
 
 function trabalhadorTemRegistos(trabId){
@@ -337,16 +387,15 @@ function calcularSalariosSemana(inicio){
   const linhas = [];
   let totalGeral = 0;
   t.trabalhadores.forEach(function(tr){
-    const d = diasSemanaTrabalhador(tr.id, inicio);
-    const diasPagos = d.completos + d.meios * 0.5;
+    const horas = horasSemanaTrabalhador(tr.id, inicio);
+    const diasPagos = horas / HORAS_DIA_COMPLETO;
     if (diasPagos === 0 && tr.ativo === false) return;
     const valorDia = valorDiarioDoTrabalhador(tr);
     const total = diasPagos * valorDia;
     totalGeral += total;
     linhas.push({
       trabalhador: tr,
-      completos: d.completos,
-      meios: d.meios,
+      horas: horas,
       diasPagos: diasPagos,
       valorDia: valorDia,
       total: total
@@ -404,6 +453,47 @@ function dadosHistoricoPomares(){
   };
 }
 
+/* ===== Custos de empresas externas ===== */
+
+function custosEmpresasSemana(inicio){
+  const t = temporada();
+  const linhas = [];
+  let totalGeral = 0, totalPessoasDia = 0;
+  t.empresas.forEach(function(emp){
+    let pessoasDia = 0;
+    for (let i = 0; i < 7; i++) {
+      const re = t.registoEmpresas[somarDias(inicio, i)];
+      if (re && re[emp.id] != null) pessoasDia += parseInt(re[emp.id], 10) || 0;
+    }
+    const valor = Number(emp.valorPorPessoaDia) || 0;
+    const total = pessoasDia * valor;
+    totalGeral += total;
+    totalPessoasDia += pessoasDia;
+    linhas.push({ empresa: emp, pessoasDia: pessoasDia, valor: valor, total: total });
+  });
+  linhas.sort(function(a, b){ return a.empresa.nome.localeCompare(b.empresa.nome, 'pt'); });
+  return { linhas: linhas, totalGeral: totalGeral, totalPessoasDia: totalPessoasDia };
+}
+
+/* ===== Hectares e produtividade por pomar ===== */
+
+// Hectares de um pomar pelo nome (procura na temporada atual e depois nas outras)
+function hectaresDoPomarPorNome(nome){
+  const atual = temporada().pomares.find(function(p){ return p.nome === nome && p.hectares > 0; });
+  if (atual) return atual.hectares;
+  let h = null;
+  Object.keys(DB.temporadas).forEach(function(ch){
+    if (h != null) return;
+    const p = DB.temporadas[ch].pomares.find(function(x){ return x.nome === nome && x.hectares > 0; });
+    if (p) h = p.hectares;
+  });
+  return h;
+}
+
+function tonPorHectare(kg, hectares){
+  return (hectares && hectares > 0) ? (kg / 1000) / hectares : null;
+}
+
 /* ===== Gestão de temporadas ===== */
 
 function fecharTemporadaAtual(){
@@ -416,8 +506,7 @@ function fecharTemporadaAtual(){
   });
   // Histórico de trabalhadores (dias trabalhados nesta temporada)
   t.trabalhadores.forEach(function(tr){
-    const d = diasTemporadaTrabalhador(tr.id);
-    const dias = d.completos + d.meios * 0.5;
+    const dias = horasTemporadaTrabalhador(tr.id) / HORAS_DIA_COMPLETO;
     if (dias <= 0) return;
     const chave = normalizarNome(tr.nome);
     if (!DB.historicoTrabalhadores[chave]) {

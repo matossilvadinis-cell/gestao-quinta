@@ -1,4 +1,4 @@
-// vista-grupos.js — grupos de trabalho (líder + trabalhadores), composição semanal
+// vista-grupos.js — grupos de trabalho: nome + líder fixo; composição diária vem da chamada
 'use strict';
 
 (function(){
@@ -16,37 +16,22 @@
     });
   }
 
-  function trabalhadoresSemGrupo(){
-    const t = temporada();
-    const ocupados = new Set();
-    t.grupos.forEach(function(g){
-      g.membroIds.forEach(function(id){ ocupados.add(id); });
-    });
-    return trabalhadoresAtivos().filter(function(tr){
-      return tr.tipo === 'trabalhador' && !ocupados.has(tr.id);
-    });
-  }
-
   function render(el){
     const t = temporada();
-    const livres = trabalhadoresSemGrupo();
+    const hoje = hojeISO();
     const lideresLivres = lideresDisponiveis(null);
 
     const cartoesGrupos = t.grupos.length === 0
       ? '<div class="cartao"><div class="vazio">Ainda não há grupos. Crie o primeiro grupo acima.</div></div>'
       : t.grupos.map(function(g){
         const lider = trabalhadorPorId(g.liderId);
-        const membros = g.membroIds.map(trabalhadorPorId).filter(Boolean);
-        const hoje = hojeISO();
+        const composicao = composicaoDoGrupoNoDia(g.id, hoje);
         const lotesHoje = t.producao.filter(function(r){ return r.data === hoje && r.grupoId === g.id; });
         const totHoje = totaisProducao(lotesHoje);
         const presHoje = presentesDoGrupo(g.id, hoje);
         const mediaHoje = presHoje.equivalente > 0 ? totHoje.kg / presHoje.equivalente : null;
         const opLideres = lideresDisponiveis(g.id).map(function(l){
           return '<option value="' + l.id + '"' + (l.id === g.liderId ? ' selected' : '') + '>' + esc(l.nome) + '</option>';
-        }).join('');
-        const opMembros = livres.map(function(tr){
-          return '<option value="' + tr.id + '">' + esc(tr.nome) + '</option>';
         }).join('');
 
         return '<div class="cartao">' +
@@ -55,34 +40,29 @@
             '<div><button class="btn btn-sec btn-pq" data-renomear="' + g.id + '">✏️ Renomear</button> ' +
             '<button class="btn btn-perigo btn-pq" data-eliminar="' + g.id + '">Eliminar grupo</button></div>' +
           '</div>' +
-          '<div class="resumo-chips">' +
-            '<span class="chip">Hoje: ' + fmtNum(totHoje.palotes) + ' palotes · ' + fmtKg(totHoje.kg) + '</span>' +
-            '<span class="chip">👥 ' + fmtDias(presHoje.equivalente) + ' presentes</span>' +
-            '<span class="chip ' + (mediaHoje != null ? 'chip-verde' : '') + '">📊 Média: ' +
-              (mediaHoje != null ? fmtNum(mediaHoje) + ' kg/pessoa' : '—') + '</span>' +
-          '</div>' +
           '<div class="linha-form">' +
-            '<div class="campo"><label>Líder</label>' +
+            '<div class="campo"><label>Líder (fixo)</label>' +
               '<select data-lider="' + g.id + '">' +
                 (g.liderId && !lider ? '<option value="">(líder removido)</option>' : '') +
                 (!g.liderId ? '<option value="" selected>— sem líder —</option>' : '') +
                 opLideres +
               '</select></div>' +
           '</div>' +
-          '<div><strong>Trabalhadores (' + membros.length + '):</strong></div>' +
-          '<div class="membros">' +
-            (membros.length === 0 ? '<span class="suave">Sem trabalhadores no grupo.</span>' : '') +
-            membros.map(function(m){
-              return '<span class="membro">' + esc(m.nome) +
-                '<button type="button" title="Retirar do grupo" data-retirar="' + g.id + ':' + m.id + '">✕</button></span>';
-            }).join('') +
+          '<div class="resumo-chips">' +
+            '<span class="chip">Hoje: ' + fmtNum(totHoje.palotes) + ' palotes · ' + fmtKg(totHoje.kg) + '</span>' +
+            '<span class="chip">👥 ' + fmtNum(presHoje.pessoas) + ' pessoas · ' + fmtHoras(presHoje.horas) + '</span>' +
+            '<span class="chip ' + (mediaHoje != null ? 'chip-verde' : '') + '">📊 Média: ' +
+              (mediaHoje != null ? fmtNum(mediaHoje) + ' kg/pessoa' : '—') + '</span>' +
           '</div>' +
-          '<div class="linha-form">' +
-            '<div class="campo"><label>Adicionar trabalhador</label>' +
-              '<select data-novo-membro="' + g.id + '">' +
-                (livres.length === 0 ? '<option value="">— sem trabalhadores livres —</option>' : opMembros) +
-              '</select></div>' +
-            '<button class="btn btn-sec" data-adicionar-membro="' + g.id + '"' + (livres.length === 0 ? ' disabled' : '') + '>+ Adicionar</button>' +
+          '<div><strong>Composição de hoje</strong> <span class="suave">(definida na Chamada)</span></div>' +
+          '<div class="membros">' +
+            (composicao.length === 0
+              ? '<span class="suave">Ninguém associado a este grupo na chamada de hoje.</span>'
+              : composicao.map(function(c){
+                  return '<span class="membro">' + esc(c.trabalhador.nome) +
+                    (c.trabalhador.id === g.liderId ? ' ⭐' : '') +
+                    ' <span class="suave">· ' + fmtHoras(c.horas) + '</span></span>';
+                }).join('')) +
           '</div>' +
         '</div>';
       }).join('');
@@ -90,8 +70,9 @@
     el.innerHTML =
       '<div class="cabecalho-vista"><h2>👥 Grupos de trabalho</h2></div>' +
 
-      '<div class="aviso aviso-info">ℹ️ A composição dos grupos mantém-se estável durante a semana e pode ser ' +
-      'alterada no início de cada nova semana. Cada trabalhador pertence a um único grupo de cada vez.</div>' +
+      '<div class="aviso aviso-info">ℹ️ O grupo tem apenas nome e líder fixo. A composição é definida ' +
+      'todos os dias na <strong>Chamada</strong>: cada trabalhador presente escolhe lá o grupo desse dia. ' +
+      '<button class="btn btn-pq" data-nav="chamada">Ir à Chamada</button></div>' +
 
       '<div class="cartao"><h3>➕ Criar grupo</h3>' +
         '<div class="linha-form">' +
@@ -109,6 +90,10 @@
 
       cartoesGrupos;
 
+    el.querySelectorAll('[data-nav]').forEach(function(b){
+      b.addEventListener('click', function(){ navegar(b.dataset.nav); });
+    });
+
     el.querySelector('#criar-grupo').addEventListener('click', function(){
       const nome = el.querySelector('#novo-grupo-nome').value.trim();
       const liderId = el.querySelector('#novo-grupo-lider').value || null;
@@ -117,7 +102,7 @@
         return g.nome.toLowerCase() === nome.toLowerCase();
       });
       if (existe) { toast('Já existe um grupo com esse nome.', 'erro'); return; }
-      temporada().grupos.push({ id: uid(), nome: nome, liderId: liderId, membroIds: [] });
+      temporada().grupos.push({ id: uid(), nome: nome, liderId: liderId });
       guardarDB();
       toast('Grupo "' + nome + '" criado.');
       rerender();
@@ -153,28 +138,6 @@
         const g = grupoPorId(sel.dataset.lider);
         if (!g) return;
         g.liderId = sel.value || null;
-        guardarDB();
-        rerender();
-      });
-    });
-
-    el.querySelectorAll('[data-adicionar-membro]').forEach(function(btn){
-      btn.addEventListener('click', function(){
-        const g = grupoPorId(btn.dataset.adicionarMembro);
-        const sel = el.querySelector('select[data-novo-membro="' + btn.dataset.adicionarMembro + '"]');
-        if (!g || !sel || !sel.value) return;
-        if (g.membroIds.indexOf(sel.value) === -1) g.membroIds.push(sel.value);
-        guardarDB();
-        rerender();
-      });
-    });
-
-    el.querySelectorAll('[data-retirar]').forEach(function(btn){
-      btn.addEventListener('click', function(){
-        const partes = btn.dataset.retirar.split(':');
-        const g = grupoPorId(partes[0]);
-        if (!g) return;
-        g.membroIds = g.membroIds.filter(function(id){ return id !== partes[1]; });
         guardarDB();
         rerender();
       });

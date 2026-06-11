@@ -7,6 +7,7 @@ const NAV = [
   { id: 'producao',      rotulo: 'Produção',         icone: '🧺' },
   { id: 'stock',         rotulo: 'Stock & Entregas', icone: '📦' },
   { id: 'salarios',      rotulo: 'Salários',         icone: '💶' },
+  { id: 'empresas',      rotulo: 'Empresas',         icone: '🏢' },
   { id: 'grupos',        rotulo: 'Grupos',           icone: '👥' },
   { id: 'trabalhadores', rotulo: 'Trabalhadores',    icone: '🧑‍🌾' },
   { id: 'pomares',       rotulo: 'Pomares',          icone: '🌳' },

@@ -71,12 +71,14 @@ function gerarResumoDiarioPDF(dataIso){
     ' · gerado em ' + formatarData(hojeISO()));
 
   /* ===== Presenças ===== */
-  const reg = t.chamadas[dataIso] || {};
   const presentes = [];
-  const meios = [];
+  let parciais = 0, horasTotais = 0;
   ordenarTrabalhadores(t.trabalhadores).forEach(function(tr){
-    if (reg[tr.id] === 'P') presentes.push(tr);
-    else if (reg[tr.id] === 'M') meios.push(tr);
+    const r = registoChamada(dataIso, tr.id);
+    if (!r || r.horas <= 0) return;
+    presentes.push({ trabalhador: tr, horas: r.horas, grupoId: grupoDoTrabalhadorNoDia(tr.id, dataIso) });
+    horasTotais += r.horas;
+    if (r.horas < HORAS_DIA_COMPLETO) parciais++;
   });
   let externos = 0;
   const linhasEmpresas = [];
@@ -88,21 +90,22 @@ function gerarResumoDiarioPDF(dataIso){
       linhasEmpresas.push(emp.nome + ': ' + n + ' pessoa(s)');
     }
   });
-  const totalDiretos = presentes.length + meios.length;
+  const totalDiretos = presentes.length;
 
   seccao('Presenças');
   linha('Trabalhadores diretos: ' + totalDiretos +
-    (meios.length ? ' (' + meios.length + ' a meio-dia)' : '') +
+    (parciais ? ' (' + parciais + ' parciais)' : '') +
+    '  ·  ' + fmtHoras(horasTotais) +
     '  ·  Empresas externas: ' + externos +
-    '  ·  Total: ' + (totalDiretos + externos), false, true);
+    '  ·  Total: ' + (totalDiretos + externos) + ' pessoas', false, true);
   if (totalDiretos === 0) {
     vazio('Sem presenças de trabalhadores diretos registadas neste dia.');
   } else {
-    presentes.forEach(function(tr){
-      linha('• ' + tr.nome + (tr.tipo === 'lider' ? ' (líder)' : '') + ' — dia completo', true);
-    });
-    meios.forEach(function(tr){
-      linha('• ' + tr.nome + (tr.tipo === 'lider' ? ' (líder)' : '') + ' — meio-dia', true);
+    presentes.forEach(function(p){
+      const g = p.grupoId ? grupoPorId(p.grupoId) : null;
+      linha('• ' + p.trabalhador.nome + (p.trabalhador.tipo === 'lider' ? ' (líder)' : '') +
+        ' — ' + fmtHoras(p.horas) +
+        (g ? ' — ' + g.nome : ''), true);
     });
   }
   linhasEmpresas.forEach(function(l){ linha('• ' + l, true); });
@@ -137,7 +140,7 @@ function gerarResumoDiarioPDF(dataIso){
       if (b.grupoId) {
         const pres = presentesDoGrupo(b.grupoId, dataIso);
         const media = pres.equivalente > 0 ? Math.round(tot.kg / pres.equivalente) : null;
-        sufixo = ' — ' + fmtDias(pres.equivalente) + ' presente(s)' +
+        sufixo = ' — ' + fmtNum(pres.pessoas) + ' pessoa(s), ' + fmtHoras(pres.horas) +
           (media != null ? ' — média ' + fmtNum(media) + ' kg/pessoa' : '');
       }
       quebraSePreciso(8);

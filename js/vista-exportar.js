@@ -28,20 +28,19 @@
     }
     const tabela =
       '<table>' +
-      '<tr><th colspan="7">Resumo salarial — ' + rotuloSemana(semana) + ' ' + temporada().ano +
+      '<tr><th colspan="6">Resumo salarial — ' + rotuloSemana(semana) + ' ' + temporada().ano +
         ' (pagamento: sábado, ' + formatarData(sabadoDaSemana(semana)) + ')</th></tr>' +
-      '<tr><th>Nome</th><th>Tipo</th><th>Dias completos</th><th>Meios-dias</th>' +
-      '<th>Dias pagos</th><th>Valor diário (€)</th><th>Total a pagar (€)</th></tr>' +
+      '<tr><th>Nome</th><th>Tipo</th><th>Horas trabalhadas</th>' +
+      '<th>Dias equivalentes</th><th>Valor diário (€)</th><th>Total a pagar (€)</th></tr>' +
       linhas.map(function(l){
         return '<tr><td>' + esc(l.trabalhador.nome) + '</td>' +
           '<td>' + (l.trabalhador.tipo === 'lider' ? 'Líder' : 'Trabalhador') + '</td>' +
-          '<td>' + fmtNum(l.completos) + '</td>' +
-          '<td>' + fmtNum(l.meios) + '</td>' +
-          '<td>' + fmtDias(l.diasPagos) + '</td>' +
+          '<td>' + fmtNum(l.horas, 1) + '</td>' +
+          '<td>' + fmtNum(l.diasPagos, 2) + '</td>' +
           '<td>' + fmtNum(l.valorDia, 2) + '</td>' +
           '<td>' + fmtNum(l.total, 2) + '</td></tr>';
       }).join('') +
-      '<tr><th colspan="6">Total geral</th><th>' + fmtNum(res.totalGeral, 2) + '</th></tr>' +
+      '<tr><th colspan="5">Total geral</th><th>' + fmtNum(res.totalGeral, 2) + '</th></tr>' +
       '</table>';
     descarregarFicheiro('salarios_semana_' + semana + '.xls',
       envolverExcel('Salarios', tabela), 'application/vnd.ms-excel');
@@ -89,9 +88,34 @@
     toast('Relatório de produção exportado.');
   }
 
-  // Disponível para outras vistas (ex.: botão na vista de salários)
+  function exportarEmpresas(semana){
+    const custos = custosEmpresasSemana(semana);
+    if (custos.linhas.length === 0) {
+      toast('Não há empresas externas registadas — nada para exportar.', 'erro');
+      return;
+    }
+    const tabela =
+      '<table>' +
+      '<tr><th colspan="4">Custos de empresas externas — ' + rotuloSemana(semana) + ' ' + temporada().ano + '</th></tr>' +
+      '<tr><th>Empresa</th><th>Pessoas-dia</th><th>Valor por pessoa-dia (€)</th><th>Total a pagar (€)</th></tr>' +
+      custos.linhas.map(function(l){
+        return '<tr><td>' + esc(l.empresa.nome) + '</td>' +
+          '<td>' + fmtNum(l.pessoasDia) + '</td>' +
+          '<td>' + fmtNum(l.valor, 2) + '</td>' +
+          '<td>' + fmtNum(l.total, 2) + '</td></tr>';
+      }).join('') +
+      '<tr><th>Total geral</th><th>' + fmtNum(custos.totalPessoasDia) + '</th><th></th>' +
+      '<th>' + fmtNum(custos.totalGeral, 2) + '</th></tr>' +
+      '</table>';
+    descarregarFicheiro('empresas_semana_' + semana + '.xls',
+      envolverExcel('Empresas', tabela), 'application/vnd.ms-excel');
+    toast('Relatório de empresas externas exportado.');
+  }
+
+  // Disponível para outras vistas (ex.: botões nas vistas de salários e empresas)
   window.exportarRelatorioSalarios = exportarSalarios;
   window.exportarRelatorioProducao = exportarProducao;
+  window.exportarRelatorioEmpresas = exportarEmpresas;
 
   function render(el){
     const semanas = semanasDaTemporada();
@@ -119,6 +143,9 @@
         '<div class="cartao"><h3>🧺 Produção semanal</h3>' +
           '<p>Kg e palotes por variedade e por pomar, total da semana e acumulado da temporada.</p>' +
           '<button class="btn" id="exp-producao">📥 Descarregar relatório de produção</button></div>' +
+        '<div class="cartao"><h3>🏢 Custos de empresas externas</h3>' +
+          '<p>Pessoas-dia por empresa na semana, valor por pessoa-dia e total a pagar a cada empresa.</p>' +
+          '<button class="btn" id="exp-empresas">📥 Descarregar custos de empresas</button></div>' +
       '</div>' +
 
       '<div class="cartao"><h3>📄 Resumo diário (PDF)</h3>' +
@@ -138,6 +165,9 @@
     });
     el.querySelector('#exp-producao').addEventListener('click', function(){
       exportarProducao(semanaSel);
+    });
+    el.querySelector('#exp-empresas').addEventListener('click', function(){
+      exportarEmpresas(semanaSel);
     });
     el.querySelector('#exp-pdf').addEventListener('click', function(){
       const data = el.querySelector('#pdf-data').value || hojeISO();

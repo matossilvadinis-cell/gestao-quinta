@@ -35,8 +35,10 @@
                 const kg = dados.valores[p][a];
                 if (kg == null) return '<div class="grafico-barra vazia" style="width:34px"></div>';
                 const altura = Math.max(5, Math.round(kg / maxKg * 170));
+                const tha = tonPorHectare(kg, hectaresDoPomarPorNome(p));
                 return '<div class="grafico-barra" style="height:' + altura + 'px;background:' +
-                  CORES[i % CORES.length] + '" title="' + esc(p) + ' — ' + a + ': ' + fmtTon(kg) + '">' +
+                  CORES[i % CORES.length] + '" title="' + esc(p) + ' — ' + a + ': ' + fmtTon(kg) +
+                  (tha != null ? ' (' + fmtNum(tha, 1) + ' t/ha)' : '') + '">' +
                   '<span>' + fmtNum(kg / 1000, 1) + '</span></div>';
               }).join('') +
             '</div><div class="grafico-rotulo">' + esc(p) + '</div></div>';
@@ -46,19 +48,27 @@
 
     }
 
-    // Tabela pomar × ano
+    // Tabela pomar × ano (com toneladas/hectare quando os hectares estão definidos)
     let tabela = '';
     if (temDados) {
-      tabela = '<div class="tabela-envolver"><table class="tabela"><thead><tr><th>Pomar</th>' +
+      tabela = '<div class="tabela-envolver"><table class="tabela"><thead><tr><th>Pomar</th><th class="num">Hectares</th>' +
         dados.anos.map(function(a){ return '<th class="num">' + a + '</th>'; }).join('') +
         '</tr></thead><tbody>' +
         dados.pomares.map(function(p){
+          const ha = hectaresDoPomarPorNome(p);
           return '<tr><td>' + esc(p) + '</td>' +
+            '<td class="num">' + (ha != null ? fmtNum(ha, 1) + ' ha' : '—') + '</td>' +
             dados.anos.map(function(a){
               const kg = dados.valores[p][a];
-              return '<td class="num">' + (kg == null ? '—' : fmtTon(kg)) + '</td>';
+              if (kg == null) return '<td class="num">—</td>';
+              const tha = tonPorHectare(kg, ha);
+              return '<td class="num">' + fmtTon(kg) +
+                (tha != null ? '<div class="suave" style="font-size:.75rem">' + fmtNum(tha, 1) + ' t/ha</div>' : '') +
+                '</td>';
             }).join('') + '</tr>';
-        }).join('') + '</tbody></table></div>';
+        }).join('') + '</tbody></table></div>' +
+        '<p class="suave">Os hectares definem-se na Configuração dos pomares; o indicador t/ha usa os hectares ' +
+        'atuais do pomar, também para os anos anteriores.</p>';
     }
 
     // Registos históricos guardados manualmente / por fecho de temporada

@@ -30,20 +30,19 @@
     const tabela = res.linhas.length === 0
       ? '<div class="vazio">Não há trabalhadores registados.</div>'
       : '<div class="tabela-envolver"><table class="tabela"><thead><tr>' +
-        '<th>Nome</th><th>Tipo</th><th class="num">Dias completos</th><th class="num">Meios-dias</th>' +
-        '<th class="num">Dias pagos</th><th class="num">Valor diário</th><th class="num">Total a pagar</th></tr></thead><tbody>' +
+        '<th>Nome</th><th>Tipo</th><th class="num">Horas trabalhadas</th>' +
+        '<th class="num">Dias equivalentes</th><th class="num">Valor diário</th><th class="num">Total a pagar</th></tr></thead><tbody>' +
         res.linhas.map(function(l){
           const cls = l.diasPagos === 0 ? ' class="linha-inativa"' : '';
           return '<tr' + cls + '><td>' + esc(l.trabalhador.nome) + '</td>' +
             '<td><span class="badge ' + (l.trabalhador.tipo === 'lider' ? 'badge-lider' : 'badge-trab') + '">' +
               (l.trabalhador.tipo === 'lider' ? 'Líder' : 'Trabalhador') + '</span></td>' +
-            '<td class="num">' + fmtNum(l.completos) + '</td>' +
-            '<td class="num">' + fmtNum(l.meios) + '</td>' +
-            '<td class="num">' + fmtDias(l.diasPagos) + '</td>' +
+            '<td class="num">' + fmtHoras(l.horas) + '</td>' +
+            '<td class="num">' + fmtDias(Math.round(l.diasPagos * 100) / 100) + '</td>' +
             '<td class="num">' + fmtEuro(l.valorDia) + '</td>' +
             '<td class="num"><strong>' + fmtEuro(l.total) + '</strong></td></tr>';
         }).join('') +
-        '</tbody><tfoot><tr><td colspan="6">Total geral da semana</td>' +
+        '</tbody><tfoot><tr><td colspan="5">Total geral da semana</td>' +
         '<td class="num">' + fmtEuro(res.totalGeral) + '</td></tr></tfoot></table></div>';
 
     // ----- Caixa -----
@@ -93,8 +92,8 @@
             : '<button class="btn" id="marcar-pago">Marcar semana como paga</button>') +
           '<button class="btn btn-sec" id="exportar-semana">📤 Exportar Excel</button>' +
         '</div>' +
-        '<p class="suave">Cálculo automático com base na chamada: dia completo × valor diário; meio-dia × metade. ' +
-        'Quem esteve ausente não recebe esse dia.</p>' +
+        '<p class="suave">Cálculo automático com base nas horas da chamada: (horas ÷ ' + HORAS_DIA_COMPLETO +
+        ') × valor diário. Dia completo = ' + HORAS_DIA_COMPLETO + ' h; quem esteve ausente não recebe esse dia.</p>' +
         tabela +
       '</div>';
 

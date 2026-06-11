@@ -31,7 +31,7 @@
     const tTotal = totaisProducao(t.producao);
 
     const resumo = resumoChamadaDia(hoje);
-    const presentesDiretos = resumo.presentes + resumo.meios;
+    const presentesDiretos = resumo.presentes;
     const stock = stockPorVariedade();
 
     const porVar = agruparProducaoPorVariedade(t.producao);
@@ -115,8 +115,8 @@
         '<div class="cartao stat"><div class="stat-rotulo">Pessoas hoje</div>' +
           '<div class="stat-valor">' + fmtNum(presentesDiretos + resumo.externos) + '</div>' +
           '<div class="stat-sub">' + fmtNum(presentesDiretos) + ' diretos' +
-          (resumo.meios ? ' (' + fmtNum(resumo.meios) + ' a meio-dia)' : '') +
-          ' · ' + fmtNum(resumo.externos) + ' de empresas</div></div>' +
+          (resumo.parciais ? ' (' + fmtNum(resumo.parciais) + ' parciais)' : '') +
+          ' · ' + fmtNum(resumo.externos) + ' de empresas · ' + fmtHoras(resumo.horasTotais) + '</div></div>' +
       '</div>' +
 
       '<div class="grelha grelha-2">' +
@@ -135,7 +135,7 @@
           })() +
           '<div class="resumo-chips">' +
             '<span class="chip chip-verde">' + fmtNum(resumo.presentes) + ' presentes hoje</span>' +
-            (resumo.meios ? '<span class="chip chip-laranja">' + fmtNum(resumo.meios) + ' meio-dia</span>' : '') +
+            (resumo.parciais ? '<span class="chip chip-laranja">' + fmtNum(resumo.parciais) + ' parciais</span>' : '') +
             (resumo.ausentes ? '<span class="chip chip-vermelho">' + fmtNum(resumo.ausentes) + ' ausentes</span>' : '') +
           '</div>' +
           '<button class="btn btn-sec btn-pq" data-nav="salarios">Ver salários da semana</button></div>' +
@@ -148,7 +148,13 @@
           })) + '</div>' +
         '<div class="cartao"><h3>🌳 Produção por pomar (temporada)</h3>' +
           barrasHorizontais(porPomar.map(function(x){
-            return { rotulo: x.pomar.nome, sub: x.variedade ? x.variedade.nome : '', kg: x.kg };
+            const tha = tonPorHectare(x.kg, x.pomar.hectares);
+            return {
+              rotulo: x.pomar.nome,
+              sub: (x.variedade ? x.variedade.nome : '') +
+                (tha != null ? ' · ' + fmtNum(tha, 1) + ' t/ha' : ''),
+              kg: x.kg
+            };
           })) + '</div>' +
       '</div>' +
 

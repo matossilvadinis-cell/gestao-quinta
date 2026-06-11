@@ -104,6 +104,10 @@ function fmtDias(d){
   return Number.isInteger(d) ? fmtNum(d) : fmtNum(d, 1);
 }
 
+function fmtHoras(h){
+  return (Number.isInteger(h) ? fmtNum(h) : fmtNum(h, 1)) + ' h';
+}
+
 /* ===== Ficheiros ===== */
 
 function descarregarFicheiro(nome, conteudo, tipoMime){

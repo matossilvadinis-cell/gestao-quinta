@@ -1,4 +1,4 @@
-// vista-chamada.js — chamada diária (presenças) e pessoas de empresas externas
+// vista-chamada.js — chamada diária por horas, grupo do dia e pessoas de empresas externas
 'use strict';
 
 (function(){
@@ -10,24 +10,49 @@
   function render(el){
     const t = temporada();
     const trabs = ordenarTrabalhadores(trabalhadoresAtivos());
-    const reg = t.chamadas[dataSel] || {};
     const resumo = resumoChamadaDia(dataSel);
     const registoEmp = t.registoEmpresas[dataSel] || {};
+    const grupos = t.grupos;
 
     const linhasTrabs = trabs.length === 0
       ? '<div class="vazio">Não há trabalhadores ativos. Registe-os primeiro no separador Trabalhadores.</div>'
       : '<div class="tabela-envolver"><table class="tabela"><thead><tr>' +
-        '<th>Nome</th><th>Tipo</th><th>Presença</th></tr></thead><tbody>' +
+        '<th>Nome</th><th>Tipo</th><th>Presença</th><th>Horas</th><th>Grupo do dia</th></tr></thead><tbody>' +
         trabs.map(function(tr){
-          const e = reg[tr.id] || null;
-          return '<tr><td>' + esc(tr.nome) + '</td>' +
+          const r = registoChamada(dataSel, tr.id);
+          const lidera = grupos.find(function(g){ return g.liderId === tr.id; }) || null;
+          const presente = r && r.horas >= HORAS_DIA_COMPLETO;
+          const ausente = r && r.horas === 0;
+          const parcial = r && r.horas > 0 && r.horas < HORAS_DIA_COMPLETO;
+
+          let seletorGrupo;
+          if (lidera) {
+            seletorGrupo = '<select disabled title="Líder — o grupo é fixo">' +
+              '<option>' + esc(lidera.nome) + ' (líder)</option></select>';
+          } else if (grupos.length === 0) {
+            seletorGrupo = '<span class="suave">sem grupos criados</span>';
+          } else {
+            seletorGrupo = '<select data-grupo-chamada="' + tr.id + '">' +
+              '<option value="">— sem grupo —</option>' +
+              grupos.map(function(g){
+                const sel = r && r.grupoId === g.id ? ' selected' : '';
+                return '<option value="' + g.id + '"' + sel + '>' + esc(g.nome) + '</option>';
+              }).join('') +
+            '</select>';
+          }
+
+          return '<tr>' +
+            '<td>' + esc(tr.nome) + '</td>' +
             '<td><span class="badge ' + (tr.tipo === 'lider' ? 'badge-lider' : 'badge-trab') + '">' +
               (tr.tipo === 'lider' ? 'Líder' : 'Trabalhador') + '</span></td>' +
             '<td><div class="seg" data-trab="' + tr.id + '">' +
-              '<button type="button" class="seg-btn seg-p' + (e === 'P' ? ' ativo' : '') + '" data-estado="P">Presente</button>' +
-              '<button type="button" class="seg-btn seg-m' + (e === 'M' ? ' ativo' : '') + '" data-estado="M">Meio-dia</button>' +
-              '<button type="button" class="seg-btn seg-a' + (e === 'A' ? ' ativo' : '') + '" data-estado="A">Ausente</button>' +
-            '</div></td></tr>';
+              '<button type="button" class="seg-btn seg-p' + (presente ? ' ativo' : '') + '" data-presenca="P">Presente</button>' +
+              '<button type="button" class="seg-btn seg-a' + (ausente ? ' ativo' : '') + '" data-presenca="A">Ausente</button>' +
+            '</div>' + (parcial ? ' <span class="badge badge-repetido">parcial</span>' : '') + '</td>' +
+            '<td><input type="number" min="0" max="16" step="0.5" data-horas="' + tr.id +
+              '" value="' + (r ? r.horas : '') + '" placeholder="—" style="width:72px"> <span class="suave">h</span></td>' +
+            '<td>' + seletorGrupo + '</td>' +
+          '</tr>';
         }).join('') + '</tbody></table></div>';
 
     const empresasHtml = t.empresas.length === 0
@@ -51,15 +76,19 @@
           '<span class="dia-semana">' + nomeDiaSemana(dataSel) + '</span>' +
           '<span style="flex:1"></span>' +
           '<button class="btn btn-pq" id="hoje-btn">Hoje</button>' +
-          '<button class="btn btn-pq" id="todos-presentes" title="Marca como presentes todos os que ainda não têm registo neste dia">Marcar todos presentes</button>' +
+          '<button class="btn btn-pq" id="todos-presentes" title="Marca 8 h para todos os que ainda não têm registo neste dia">Marcar todos presentes</button>' +
         '</div>' +
         '<div class="resumo-chips">' +
-          '<span class="chip chip-verde">✓ ' + fmtNum(resumo.presentes) + ' presentes</span>' +
-          '<span class="chip chip-laranja">½ ' + fmtNum(resumo.meios) + ' meio-dia</span>' +
+          '<span class="chip chip-verde">✓ ' + fmtNum(resumo.completos) + ' dia completo</span>' +
+          '<span class="chip chip-laranja">± ' + fmtNum(resumo.parciais) + ' parcial</span>' +
           '<span class="chip chip-vermelho">✗ ' + fmtNum(resumo.ausentes) + ' ausentes</span>' +
           '<span class="chip">' + fmtNum(resumo.semRegisto) + ' sem registo</span>' +
+          '<span class="chip">⏱ ' + fmtHoras(resumo.horasTotais) + ' no total</span>' +
           '<span class="chip chip-azul">🏢 ' + fmtNum(resumo.externos) + ' de empresas</span>' +
         '</div>' +
+        '<p class="suave">Presente = ' + HORAS_DIA_COMPLETO + ' h (editável). Pode registar qualquer valor intermédio (ex.: 4 h, 6 h) — ' +
+        'o salário é proporcional às horas. O grupo escolhido aqui define a composição do grupo nesse dia ' +
+        '(o líder pertence sempre ao seu grupo).</p>' +
         linhasTrabs +
       '</div>' +
 
@@ -68,18 +97,9 @@
       '</div>';
 
     // Navegação de datas
-    el.querySelector('#dia-ant').addEventListener('click', function(){
-      dataSel = somarDias(dataSel, -1);
-      rerender();
-    });
-    el.querySelector('#dia-seg').addEventListener('click', function(){
-      dataSel = somarDias(dataSel, 1);
-      rerender();
-    });
-    el.querySelector('#hoje-btn').addEventListener('click', function(){
-      dataSel = hojeISO();
-      rerender();
-    });
+    el.querySelector('#dia-ant').addEventListener('click', function(){ dataSel = somarDias(dataSel, -1); rerender(); });
+    el.querySelector('#dia-seg').addEventListener('click', function(){ dataSel = somarDias(dataSel, 1); rerender(); });
+    el.querySelector('#hoje-btn').addEventListener('click', function(){ dataSel = hojeISO(); rerender(); });
     el.querySelector('#data-chamada').addEventListener('change', function(ev){
       dataSel = ev.target.value || hojeISO();
       rerender();
@@ -87,28 +107,59 @@
 
     // Marcar todos presentes (apenas quem não tem registo)
     el.querySelector('#todos-presentes').addEventListener('click', function(){
-      const atual = temporada().chamadas[dataSel] || {};
       let marcados = 0;
       trabalhadoresAtivos().forEach(function(tr){
-        if (!atual[tr.id]) {
-          definirChamada(dataSel, tr.id, 'P');
-          marcados++;
-        }
+        if (registoChamada(dataSel, tr.id)) return;
+        definirChamada(dataSel, tr.id, { horas: HORAS_DIA_COMPLETO, grupoId: null });
+        marcados++;
       });
-      if (marcados > 0) toast(marcados + ' trabalhador(es) marcados como presentes.');
+      if (marcados > 0) toast(marcados + ' trabalhador(es) marcados com ' + HORAS_DIA_COMPLETO + ' h.');
       rerender();
     });
 
-    // Botões de presença (clicar no estado ativo limpa o registo)
+    // Botões Presente/Ausente (clicar no estado ativo limpa o registo)
     el.querySelectorAll('.seg[data-trab]').forEach(function(seg){
       seg.querySelectorAll('.seg-btn').forEach(function(btn){
         btn.addEventListener('click', function(){
           const id = seg.dataset.trab;
-          const atual = estadoChamada(dataSel, id);
-          const novo = btn.dataset.estado === atual ? null : btn.dataset.estado;
-          definirChamada(dataSel, id, novo);
+          const r = registoChamada(dataSel, id);
+          if (btn.dataset.presenca === 'P') {
+            if (r && r.horas >= HORAS_DIA_COMPLETO) definirChamada(dataSel, id, null);
+            else definirChamada(dataSel, id, { horas: HORAS_DIA_COMPLETO, grupoId: r ? r.grupoId : null });
+          } else {
+            if (r && r.horas === 0) definirChamada(dataSel, id, null);
+            else definirChamada(dataSel, id, { horas: 0, grupoId: null });
+          }
           rerender();
         });
+      });
+    });
+
+    // Horas trabalhadas (campo livre)
+    el.querySelectorAll('input[data-horas]').forEach(function(inp){
+      inp.addEventListener('change', function(){
+        const id = inp.dataset.horas;
+        const texto = String(inp.value).replace(',', '.').trim();
+        if (texto === '') { definirChamada(dataSel, id, null); rerender(); return; }
+        let h = parseFloat(texto);
+        if (isNaN(h) || h < 0) { toast('Horas inválidas.', 'erro'); rerender(); return; }
+        if (h > 16) h = 16;
+        const r = registoChamada(dataSel, id);
+        definirChamada(dataSel, id, { horas: h, grupoId: h > 0 && r ? r.grupoId : (h > 0 ? null : null) });
+        rerender();
+      });
+    });
+
+    // Grupo do dia
+    el.querySelectorAll('select[data-grupo-chamada]').forEach(function(sel){
+      sel.addEventListener('change', function(){
+        const id = sel.dataset.grupoChamada;
+        const r = registoChamada(dataSel, id);
+        const grupoId = sel.value || null;
+        // escolher um grupo implica presença: se não havia registo, assume dia completo
+        const horas = r ? r.horas : HORAS_DIA_COMPLETO;
+        definirChamada(dataSel, id, { horas: horas, grupoId: grupoId });
+        rerender();
       });
     });
 

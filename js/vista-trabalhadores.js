@@ -27,13 +27,14 @@
       : '<div class="tabela-envolver"><table class="tabela"><thead><tr>' +
         '<th>Nome</th><th>Tipo</th><th>Origem</th><th class="num">€/dia próprio</th><th class="num">Dias nesta temporada</th><th>Ativo</th><th></th></tr></thead><tbody>' +
         trabs.map(function(tr){
-          const d = diasTemporadaTrabalhador(tr.id);
-          const dias = d.completos + d.meios * 0.5;
+          const dias = horasTemporadaTrabalhador(tr.id) / HORAS_DIA_COMPLETO;
           const inativo = tr.ativo === false;
           const temProprio = tr.valorDiarioProprio != null && tr.valorDiarioProprio !== '';
           return '<tr' + (inativo ? ' class="linha-inativa"' : '') + '>' +
             '<td>' + esc(tr.nome) +
-              (temProprio ? ' <span class="badge badge-pago" title="Valor diário personalizado">€ próprio</span>' : '') + '</td>' +
+              (temProprio ? ' <span class="badge badge-pago" title="Valor diário personalizado">€ próprio</span>' : '') +
+              (tr.telefone ? ' <span title="' + esc(tr.telefone) + '">📞</span>' : '') +
+              (tr.notas ? ' <span title="' + esc(tr.notas) + '">📝</span>' : '') + '</td>' +
             '<td><select data-tipo="' + tr.id + '">' +
               '<option value="trabalhador"' + (tr.tipo === 'trabalhador' ? ' selected' : '') + '>Trabalhador</option>' +
               '<option value="lider"' + (tr.tipo === 'lider' ? ' selected' : '') + '>Líder</option>' +
@@ -46,7 +47,7 @@
             '<td class="num">' + fmtDias(dias) + '</td>' +
             '<td><input type="checkbox" data-ativo="' + tr.id + '"' + (inativo ? '' : ' checked') + '></td>' +
             '<td class="texto-direita">' +
-              '<button class="btn btn-sec btn-pq" data-historico="' + tr.id + '">Histórico</button> ' +
+              '<button class="btn btn-sec btn-pq" data-historico="' + tr.id + '">Detalhes</button> ' +
               '<button class="btn btn-perigo btn-pq" data-remover="' + tr.id + '">Remover</button>' +
             '</td></tr>';
         }).join('') + '</tbody></table></div>';
@@ -54,9 +55,12 @@
     const linhasEmpresas = t.empresas.length === 0
       ? '<div class="vazio">Ainda não há empresas externas registadas.</div>'
       : '<div class="tabela-envolver"><table class="tabela"><thead><tr>' +
-        '<th>Empresa</th><th class="num">Total pessoas-dia enviadas</th><th></th></tr></thead><tbody>' +
+        '<th>Empresa</th><th class="num">€/pessoa-dia</th><th class="num">Total pessoas-dia enviadas</th><th></th></tr></thead><tbody>' +
         t.empresas.map(function(emp){
           return '<tr><td>🏢 ' + esc(emp.nome) + '</td>' +
+            '<td class="num"><input type="number" min="0" step="0.5" data-valor-empresa="' + emp.id +
+              '" value="' + (emp.valorPorPessoaDia != null ? emp.valorPorPessoaDia : '') +
+              '" placeholder="0,00" style="width:90px"></td>' +
             '<td class="num">' + fmtNum(totalPessoasDiaEmpresa(emp.id)) + '</td>' +
             '<td class="texto-direita"><button class="btn btn-perigo btn-pq" data-remover-empresa="' + emp.id + '">Remover</button></td></tr>';
         }).join('') + '</tbody></table></div>';
@@ -75,6 +79,8 @@
           '</select></div>' +
           '<div class="campo"><label>€/dia próprio (opcional)</label>' +
             '<input type="number" min="0" step="0.5" id="novo-valor-proprio" placeholder="usa o geral"></div>' +
+          '<div class="campo"><label>Telefone (opcional)</label>' +
+            '<input type="text" id="novo-telefone" placeholder="9xx xxx xxx" style="width:140px"></div>' +
           '<button class="btn" id="adicionar-trab">Adicionar</button>' +
         '</div>' +
         '<div id="info-historico"></div>' +
@@ -88,6 +94,7 @@
         'Não há cálculo de faturas — a empresa trata disso.</p>' +
         '<div class="linha-form">' +
           '<div class="campo"><label>Nome da empresa</label><input type="text" id="nova-empresa" placeholder="Ex.: AgriTrabalho Lda."></div>' +
+          '<div class="campo"><label>€/pessoa-dia</label><input type="number" min="0" step="0.5" id="nova-empresa-valor" placeholder="0,00"></div>' +
           '<button class="btn" id="adicionar-empresa">Adicionar empresa</button>' +
         '</div>' +
         linhasEmpresas +
@@ -135,7 +142,9 @@
         tipo: tipo,
         repetido: !!hist,
         ativo: true,
-        valorDiarioProprio: vp
+        valorDiarioProprio: vp,
+        telefone: el.querySelector('#novo-telefone').value.trim() || null,
+        notas: null
       });
       guardarDB();
       toast(hist
@@ -188,16 +197,15 @@
       });
     });
 
-    // Histórico (modal)
+    // Detalhes (modal): histórico + contacto e notas editáveis
     el.querySelectorAll('[data-historico]').forEach(function(btn){
       btn.addEventListener('click', function(){
         const tr = trabalhadorPorId(btn.dataset.historico);
         if (!tr) return;
         const hist = procurarHistoricoTrabalhador(tr.nome);
-        const d = diasTemporadaTrabalhador(tr.id);
-        const diasAtual = d.completos + d.meios * 0.5;
+        const horasAtual = horasTemporadaTrabalhador(tr.id);
         let corpo = '<p><strong>Temporada atual (' + esc(temporada().ano) + '):</strong> ' +
-          fmtDias(diasAtual) + ' dias (' + fmtNum(d.completos) + ' completos, ' + fmtNum(d.meios) + ' meios-dias)</p>';
+          fmtDias(Math.round(horasAtual / HORAS_DIA_COMPLETO * 100) / 100) + ' dias (' + fmtHoras(horasAtual) + ')</p>';
         if (hist && Object.keys(hist.anos).length > 0) {
           corpo += '<p><strong>Anos anteriores:</strong></p><ul class="lista-simples">' +
             Object.keys(hist.anos).sort().map(function(a){
@@ -208,7 +216,24 @@
         } else {
           corpo += '<p class="suave">Sem histórico de anos anteriores.</p>';
         }
-        abrirModal('🧑‍🌾 ' + esc(tr.nome), corpo);
+        corpo += '<hr class="separador">' +
+          '<div class="linha-form">' +
+            '<div class="campo"><label>📞 Telefone</label>' +
+              '<input type="text" id="det-telefone" value="' + esc(tr.telefone || '') + '" placeholder="9xx xxx xxx"></div>' +
+          '</div>' +
+          '<div class="campo"><label>📝 Observações</label>' +
+            '<input type="text" id="det-notas" value="' + esc(tr.notas || '') +
+            '" placeholder="Ex.: vem só às terças" style="width:100%"></div>' +
+          '<div class="linha-form" style="margin-top:10px"><button class="btn" id="det-guardar">Guardar</button></div>';
+        const m = abrirModal('🧑‍🌾 ' + esc(tr.nome), corpo);
+        m.querySelector('#det-guardar').addEventListener('click', function(){
+          tr.telefone = m.querySelector('#det-telefone').value.trim() || null;
+          tr.notas = m.querySelector('#det-notas').value.trim() || null;
+          guardarDB();
+          fecharModal();
+          toast('Detalhes de ' + tr.nome + ' guardados.');
+          rerender();
+        });
       });
     });
 
@@ -225,7 +250,7 @@
         const t2 = temporada();
         t2.trabalhadores = t2.trabalhadores.filter(function(x){ return x.id !== tr.id; });
         t2.grupos.forEach(function(g){
-          g.membroIds = g.membroIds.filter(function(id){ return id !== tr.id; });
+          if (g.membroIds) g.membroIds = g.membroIds.filter(function(id){ return id !== tr.id; });
           if (g.liderId === tr.id) g.liderId = null;
         });
         guardarDB();
@@ -242,10 +267,31 @@
         return e.nome.toLowerCase() === nome.toLowerCase();
       });
       if (existe) { toast('Já existe uma empresa com esse nome.', 'erro'); return; }
-      temporada().empresas.push({ id: uid(), nome: nome });
+      const vTexto = String(el.querySelector('#nova-empresa-valor').value).replace(',', '.').trim();
+      const v = vTexto === '' ? null : parseFloat(vTexto);
+      if (v != null && (isNaN(v) || v < 0)) { toast('Valor por pessoa-dia inválido.', 'erro'); return; }
+      temporada().empresas.push({ id: uid(), nome: nome, valorPorPessoaDia: v });
       guardarDB();
       toast('Empresa "' + nome + '" adicionada.');
       rerender();
+    });
+
+    el.querySelectorAll('input[data-valor-empresa]').forEach(function(inp){
+      inp.addEventListener('change', function(){
+        const emp = empresaPorId(inp.dataset.valorEmpresa);
+        if (!emp) return;
+        const texto = String(inp.value).replace(',', '.').trim();
+        if (texto === '') {
+          emp.valorPorPessoaDia = null;
+        } else {
+          const v = parseFloat(texto);
+          if (isNaN(v) || v < 0) { toast('Valor inválido.', 'erro'); rerender(); return; }
+          emp.valorPorPessoaDia = v;
+        }
+        guardarDB();
+        toast('Valor da empresa ' + emp.nome + ' atualizado.');
+        rerender();
+      });
     });
 
     el.querySelectorAll('[data-remover-empresa]').forEach(function(btn){

@@ -32,7 +32,7 @@
     const linhasPomares = t.pomares.length === 0
       ? '<div class="vazio">Ainda não há pomares. Adicione os pomares ativos desta temporada.</div>'
       : '<div class="tabela-envolver"><table class="tabela"><thead><tr>' +
-        '<th>Pomar</th><th>Variedade</th><th>Ativo</th><th></th></tr></thead><tbody>' +
+        '<th>Pomar</th><th>Variedade</th><th class="num">Hectares</th><th>Ativo</th><th></th></tr></thead><tbody>' +
         t.pomares.map(function(p){
           const referenciado = pomarReferenciado(p.id);
           const ops = t.variedades.map(function(v){
@@ -44,6 +44,9 @@
             '<td><select data-var-pomar="' + p.id + '"' +
               (referenciado ? ' disabled title="Tem produção ou entregas registadas — a variedade já não pode mudar"' : '') +
               '>' + ops + '</select></td>' +
+            '<td class="num"><input type="number" min="0" step="0.1" data-hectares="' + p.id +
+              '" value="' + (p.hectares != null && p.hectares !== 0 ? p.hectares : '') +
+              '" placeholder="—" style="width:80px"></td>' +
             '<td><input type="checkbox" data-ativo-pomar="' + p.id + '"' + (p.ativo === false ? '' : ' checked') + '></td>' +
             '<td class="texto-direita"><button class="btn btn-perigo btn-pq" data-remover-pomar="' + p.id + '"' +
               (referenciado ? ' disabled title="Tem produção ou entregas registadas"' : '') + '>Remover</button></td></tr>';
@@ -92,6 +95,7 @@
         '<div class="linha-form" style="margin-top:10px">' +
           '<div class="campo"><label>Nome do pomar</label><input type="text" id="novo-pomar-nome" placeholder="Ex.: Pomar da Eira"></div>' +
           '<div class="campo"><label>Variedade</label><select id="novo-pomar-var">' + opcoesVariedade + '</select></div>' +
+          '<div class="campo"><label>Hectares (opcional)</label><input type="number" min="0" step="0.1" id="novo-pomar-hectares" placeholder="Ex.: 2,5"></div>' +
           '<button class="btn" id="adicionar-pomar"' + (t.variedades.length === 0 ? ' disabled' : '') + '>Adicionar pomar</button>' +
         '</div>' +
       '</div>' +
@@ -200,7 +204,10 @@
       if (!varId) { toast('Escolha a variedade do pomar.', 'erro'); return; }
       const existe = t.pomares.some(function(p){ return p.nome.toLowerCase() === nome.toLowerCase(); });
       if (existe) { toast('Já existe um pomar com esse nome.', 'erro'); return; }
-      t.pomares.push({ id: uid(), nome: nome, variedadeId: varId, ativo: true });
+      const haTexto = String(el.querySelector('#novo-pomar-hectares').value).replace(',', '.').trim();
+      const ha = haTexto === '' ? null : parseFloat(haTexto);
+      if (ha != null && (isNaN(ha) || ha < 0)) { toast('Hectares inválidos.', 'erro'); return; }
+      t.pomares.push({ id: uid(), nome: nome, variedadeId: varId, ativo: true, hectares: ha });
       guardarDB();
       toast('Pomar "' + nome + '" adicionado.');
       rerender();
@@ -213,6 +220,24 @@
         p.variedadeId = sel.value;
         guardarDB();
         toast('Variedade do pomar "' + p.nome + '" atualizada.');
+        rerender();
+      });
+    });
+
+    el.querySelectorAll('input[data-hectares]').forEach(function(inp){
+      inp.addEventListener('change', function(){
+        const p = pomarPorId(inp.dataset.hectares);
+        if (!p) return;
+        const texto = String(inp.value).replace(',', '.').trim();
+        if (texto === '') {
+          p.hectares = null;
+        } else {
+          const v = parseFloat(texto);
+          if (isNaN(v) || v < 0) { toast('Hectares inválidos.', 'erro'); rerender(); return; }
+          p.hectares = v;
+        }
+        guardarDB();
+        toast('Hectares do pomar "' + p.nome + '" atualizados.');
         rerender();
       });
     });

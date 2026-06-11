@@ -35,8 +35,7 @@
         const pres = presentesDoGrupo(g.id, dataSel);
         const media = pres.equivalente > 0 ? totGrupo.kg / pres.equivalente : null;
         const linhaMedia = '<div class="resumo-chips">' +
-          '<span class="chip">👥 ' + fmtDias(pres.equivalente) + ' presentes no dia' +
-            (pres.meios ? ' (' + fmtNum(pres.meios) + ' a meio-dia)' : '') + '</span>' +
+          '<span class="chip">👥 ' + fmtNum(pres.pessoas) + ' pessoas no dia · ' + fmtHoras(pres.horas) + '</span>' +
           '<span class="chip ' + (media != null ? 'chip-verde' : '') + '">📊 Média: ' +
             (media != null ? fmtNum(media) + ' kg/pessoa' : '—') + '</span>' +
         '</div>';
@@ -60,8 +59,7 @@
 
         return '<div class="cartao">' +
           '<h3>👥 ' + esc(g.nome) +
-            ' <span class="suave">— líder: ' + esc(lider ? lider.nome : '—') +
-            ' · ' + fmtNum(g.membroIds.length) + ' trabalhador(es)</span></h3>' +
+            ' <span class="suave">— líder: ' + esc(lider ? lider.nome : '—') + '</span></h3>' +
           linhaMedia +
           linhasLotes +
           '<div class="linha-form" style="margin-top:10px">' +
