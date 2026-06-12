@@ -1,0 +1,4 @@
+buckup/
+backups/
+*.backup.json
+gestao-quinta-backup-*.json
