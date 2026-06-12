@@ -11,41 +11,71 @@
     const dados = dadosHistoricoPomares();
     const temDados = dados.pomares.length > 0;
 
-    // Gráfico de barras agrupadas: um grupo por pomar, uma barra por ano
-    let grafico = '<div class="vazio">Ainda não há dados de produção — registe produção ou adicione registos de anos anteriores abaixo.</div>';
-    if (temDados) {
-      let maxKg = 1;
-      dados.pomares.forEach(function(p){
-        dados.anos.forEach(function(a){
-          const v = dados.valores[p][a];
-          if (v && v > maxKg) maxKg = v;
+    // Gráfico de barras agrupadas: um grupo por pomar, uma barra por ano.
+    // obterValor(p, a) devolve o número a desenhar (ou null); tituloBarra(p, a, v) é o tooltip.
+    function graficoAgrupado(pomares, anos, obterValor, tituloBarra){
+      let max = 0;
+      pomares.forEach(function(p){
+        anos.forEach(function(a){
+          const v = obterValor(p, a);
+          if (v != null && v > max) max = v;
         });
       });
-      grafico =
-        '<div class="legenda">' +
-          dados.anos.map(function(a, i){
+      if (max <= 0) max = 1;
+      return '<div class="legenda">' +
+          anos.map(function(a, i){
             return '<span class="legenda-item"><span class="legenda-cor" style="background:' +
               CORES[i % CORES.length] + '"></span>' + a + '</span>';
           }).join('') +
         '</div>' +
         '<div class="grafico-grupos">' +
-          dados.pomares.map(function(p){
+          pomares.map(function(p){
             return '<div class="grafico-grupo"><div class="grafico-barras">' +
-              dados.anos.map(function(a, i){
-                const kg = dados.valores[p][a];
-                if (kg == null) return '<div class="grafico-barra vazia" style="width:34px"></div>';
-                const altura = Math.max(5, Math.round(kg / maxKg * 170));
-                const tha = tonPorHectare(kg, hectaresDoPomarPorNome(p));
+              anos.map(function(a, i){
+                const v = obterValor(p, a);
+                if (v == null) return '<div class="grafico-barra vazia" style="width:34px"></div>';
+                const altura = Math.max(5, Math.round(v / max * 170));
                 return '<div class="grafico-barra" style="height:' + altura + 'px;background:' +
-                  CORES[i % CORES.length] + '" title="' + esc(p) + ' — ' + a + ': ' + fmtTon(kg) +
-                  (tha != null ? ' (' + fmtNum(tha, 1) + ' t/ha)' : '') + '">' +
-                  '<span>' + fmtNum(kg / 1000, 1) + '</span></div>';
+                  CORES[i % CORES.length] + '" title="' + esc(tituloBarra(p, a, v)) + '">' +
+                  '<span>' + fmtNum(v, 1) + '</span></div>';
               }).join('') +
             '</div><div class="grafico-rotulo">' + esc(p) + '</div></div>';
           }).join('') +
-        '</div>' +
+        '</div>';
+    }
+
+    let grafico = '<div class="vazio">Ainda não há dados de produção — registe produção ou adicione registos de anos anteriores abaixo.</div>';
+    let graficoHa = '';
+    if (temDados) {
+      grafico = graficoAgrupado(dados.pomares, dados.anos,
+        function(p, a){
+          const kg = dados.valores[p][a];
+          return kg == null ? null : kg / 1000;
+        },
+        function(p, a, v){
+          const tha = tonPorHectare(dados.valores[p][a], hectaresDoPomarPorNome(p));
+          return p + ' — ' + a + ': ' + fmtNum(v, 1) + ' t' +
+            (tha != null ? ' (' + fmtNum(tha, 1) + ' t/ha)' : '');
+        }) +
         '<p class="suave">Valores em toneladas. Passe o rato sobre as barras para ver o detalhe.</p>';
 
+      const pomaresComHa = dados.pomares.filter(function(p){
+        return hectaresDoPomarPorNome(p) > 0;
+      });
+      if (pomaresComHa.length > 0) {
+        graficoHa = graficoAgrupado(pomaresComHa, dados.anos,
+          function(p, a){
+            return tonPorHectare(dados.valores[p][a], hectaresDoPomarPorNome(p));
+          },
+          function(p, a, v){
+            return p + ' (' + fmtNum(hectaresDoPomarPorNome(p), 1) + ' ha) — ' + a + ': ' +
+              fmtNum(v, 1) + ' t/ha';
+          }) +
+          '<p class="suave">Produtividade = toneladas ÷ hectares do pomar. Só aparecem pomares com hectares definidos na Configuração' +
+          (pomaresComHa.length < dados.pomares.length
+            ? ' (' + (dados.pomares.length - pomaresComHa.length) + ' pomar(es) sem hectares ficaram de fora)'
+            : '') + '.</p>';
+      }
     }
 
     // Tabela pomar × ano (com toneladas/hectare quando os hectares estão definidos)
@@ -101,6 +131,10 @@
       '<div class="cabecalho-vista"><h2>🌳 Histórico de pomares</h2></div>' +
 
       '<div class="cartao"><h3>📈 Evolução ano a ano (toneladas por pomar)</h3>' + grafico + '</div>' +
+
+      (graficoHa
+        ? '<div class="cartao"><h3>🌱 Evolução ano a ano (toneladas por hectare)</h3>' + graficoHa + '</div>'
+        : '') +
 
       (tabela ? '<div class="cartao"><h3>📋 Produção por pomar e por temporada</h3>' + tabela +
         '<p class="suave">A temporada atual é calculada automaticamente a partir da produção registada. ' +

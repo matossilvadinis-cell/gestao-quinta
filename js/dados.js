@@ -240,6 +240,27 @@ function presentesDoGrupo(grupoId, data){
   return { pessoas: pessoas, horas: horas, equivalente: horas / HORAS_DIA_COMPLETO };
 }
 
+// Copia as atribuições de grupo do dia anterior para os presentes do dia
+// (só o grupo — as presenças/horas de hoje não são alteradas; líderes são fixos)
+function copiarGruposDoDiaAnterior(data){
+  const t = temporada();
+  const ontem = somarDias(data, -1);
+  let aplicados = 0, semPresencaHoje = 0, comGrupoOntem = 0;
+  trabalhadoresAtivos().forEach(function(tr){
+    if (t.grupos.some(function(g){ return g.liderId === tr.id; })) return;
+    const rOntem = registoChamada(ontem, tr.id);
+    if (!rOntem || !rOntem.grupoId || !grupoPorId(rOntem.grupoId)) return;
+    comGrupoOntem++;
+    const rHoje = registoChamada(data, tr.id);
+    if (!rHoje || rHoje.horas <= 0) { semPresencaHoje++; return; }
+    if (rHoje.grupoId !== rOntem.grupoId) {
+      definirChamada(data, tr.id, { horas: rHoje.horas, grupoId: rOntem.grupoId });
+      aplicados++;
+    }
+  });
+  return { aplicados: aplicados, semPresencaHoje: semPresencaHoje, comGrupoOntem: comGrupoOntem };
+}
+
 // Composição do grupo num dia, para listagem
 function composicaoDoGrupoNoDia(grupoId, data){
   const t = temporada();

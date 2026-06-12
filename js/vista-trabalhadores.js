@@ -3,6 +3,8 @@
 
 (function(){
 
+  let filtro = '';
+
   Vistas.trabalhadores = { render: render };
 
   function totalPessoasDiaEmpresa(empId){
@@ -30,7 +32,7 @@
           const dias = horasTemporadaTrabalhador(tr.id) / HORAS_DIA_COMPLETO;
           const inativo = tr.ativo === false;
           const temProprio = tr.valorDiarioProprio != null && tr.valorDiarioProprio !== '';
-          return '<tr' + (inativo ? ' class="linha-inativa"' : '') + '>' +
+          return '<tr data-nome-procura="' + esc(normalizarNome(tr.nome)) + '"' + (inativo ? ' class="linha-inativa"' : '') + '>' +
             '<td>' + esc(tr.nome) +
               (temProprio ? ' <span class="badge badge-pago" title="Valor diário personalizado">€ próprio</span>' : '') +
               (tr.telefone ? ' <span title="' + esc(tr.telefone) + '">📞</span>' : '') +
@@ -87,7 +89,9 @@
         '<p class="suave">Ao escrever o nome, a app verifica automaticamente se o trabalhador já trabalhou em anos anteriores.</p>' +
       '</div>' +
 
-      '<div class="cartao"><h3>📋 Trabalhadores da temporada (' + fmtNum(t.trabalhadores.length) + ')</h3>' + linhasTrabs + '</div>' +
+      '<div class="cartao"><h3>📋 Trabalhadores da temporada (' + fmtNum(t.trabalhadores.length) + ')</h3>' +
+        '<div class="linha-form"><input type="text" id="procura-trab" placeholder="🔍 Procurar trabalhador…" value="' + esc(filtro) + '" style="min-width:220px"></div>' +
+        linhasTrabs + '</div>' +
 
       '<div class="cartao"><h3>🏢 Empresas externas</h3>' +
         '<p class="suave">Registe as empresas aqui; o número de pessoas enviadas por dia regista-se na Chamada. ' +
@@ -99,6 +103,20 @@
         '</div>' +
         linhasEmpresas +
       '</div>';
+
+    // Pesquisa rápida (filtra as linhas sem re-render, para não perder o foco)
+    const inpProcura = el.querySelector('#procura-trab');
+    function aplicarFiltro(){
+      const chave = normalizarNome(inpProcura.value);
+      el.querySelectorAll('tr[data-nome-procura]').forEach(function(linha){
+        linha.style.display = (!chave || linha.dataset.nomeProcura.indexOf(chave) !== -1) ? '' : 'none';
+      });
+    }
+    inpProcura.addEventListener('input', function(){
+      filtro = inpProcura.value;
+      aplicarFiltro();
+    });
+    aplicarFiltro();
 
     // Reconhecimento automático ao escrever o nome
     const inpNome = el.querySelector('#novo-nome');

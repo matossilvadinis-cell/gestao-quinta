@@ -4,6 +4,7 @@
 (function(){
 
   let dataSel = hojeISO();
+  let filtro = '';
 
   Vistas.chamada = { render: render };
 
@@ -41,7 +42,7 @@
             '</select>';
           }
 
-          return '<tr>' +
+          return '<tr data-nome-procura="' + esc(normalizarNome(tr.nome)) + '">' +
             '<td>' + esc(tr.nome) + '</td>' +
             '<td><span class="badge ' + (tr.tipo === 'lider' ? 'badge-lider' : 'badge-trab') + '">' +
               (tr.tipo === 'lider' ? 'Líder' : 'Trabalhador') + '</span></td>' +
@@ -77,6 +78,10 @@
           '<span style="flex:1"></span>' +
           '<button class="btn btn-pq" id="hoje-btn">Hoje</button>' +
           '<button class="btn btn-pq" id="todos-presentes" title="Marca 8 h para todos os que ainda não têm registo neste dia">Marcar todos presentes</button>' +
+          '<button class="btn btn-sec btn-pq" id="copiar-grupos" title="Aplica aos presentes de hoje o grupo que cada um teve no dia anterior (as presenças e horas não mudam)">↩︎ Copiar grupos de ontem</button>' +
+        '</div>' +
+        '<div class="linha-form">' +
+          '<input type="text" id="procura-chamada" placeholder="🔍 Procurar trabalhador…" value="' + esc(filtro) + '" style="min-width:220px">' +
         '</div>' +
         '<div class="resumo-chips">' +
           '<span class="chip chip-verde">✓ ' + fmtNum(resumo.completos) + ' dia completo</span>' +
@@ -102,6 +107,36 @@
     el.querySelector('#hoje-btn').addEventListener('click', function(){ dataSel = hojeISO(); rerender(); });
     el.querySelector('#data-chamada').addEventListener('change', function(ev){
       dataSel = ev.target.value || hojeISO();
+      rerender();
+    });
+
+    // Pesquisa rápida (filtra as linhas sem re-render, para não perder o foco)
+    const inpProcura = el.querySelector('#procura-chamada');
+    function aplicarFiltro(){
+      const chave = normalizarNome(inpProcura.value);
+      el.querySelectorAll('tr[data-nome-procura]').forEach(function(linha){
+        linha.style.display = (!chave || linha.dataset.nomeProcura.indexOf(chave) !== -1) ? '' : 'none';
+      });
+    }
+    inpProcura.addEventListener('input', function(){
+      filtro = inpProcura.value;
+      aplicarFiltro();
+    });
+    aplicarFiltro();
+
+    // Copiar os grupos do dia anterior (só o grupo; presenças/horas mantêm-se)
+    el.querySelector('#copiar-grupos').addEventListener('click', function(){
+      const res = copiarGruposDoDiaAnterior(dataSel);
+      if (res.comGrupoOntem === 0) {
+        toast('Não há grupos registados no dia anterior (' + formatarData(somarDias(dataSel, -1)) + ').', 'erro');
+      } else if (res.aplicados === 0 && res.semPresencaHoje > 0) {
+        toast('Marque primeiro as presenças de hoje — o grupo só é copiado para quem está presente.', 'erro');
+      } else if (res.aplicados === 0) {
+        toast('Os grupos de hoje já estão iguais aos de ontem.');
+      } else {
+        toast('Grupo de ontem aplicado a ' + res.aplicados + ' trabalhador(es).' +
+          (res.semPresencaHoje > 0 ? ' (' + res.semPresencaHoje + ' sem presença hoje ficaram de fora.)' : ''));
+      }
       rerender();
     });
 

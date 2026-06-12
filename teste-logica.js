@@ -120,6 +120,18 @@ verificar('grupo na segunda: 3 pessoas, 20 h, 2,5 dias equivalentes',
 verificar('média do grupo = 1840 ÷ 2,5 = 736 kg/pessoa', 1840 / presG.equivalente === 736);
 verificar('composição do dia tem 3 nomes', composicaoDoGrupoNoDia('g1', seg).length === 3);
 
+print('— Copiar grupos do dia anterior —');
+// terça: w1 presente com grupo errado (null), w2 ausente; ontem (segunda) w1 estava no g1
+definirChamada(ter, 'w1', { horas: 8, grupoId: null });
+var resCopia = copiarGruposDoDiaAnterior(ter);
+verificar('grupo de ontem aplicado só ao presente (w1)', resCopia.aplicados === 1);
+verificar('w1 ficou no g1 mantendo as horas de hoje',
+  registoChamada(ter, 'w1').grupoId === 'g1' && registoChamada(ter, 'w1').horas === 8);
+verificar('w2 (ausente hoje) não foi alterado', registoChamada(ter, 'w2').horas === 0 &&
+  registoChamada(ter, 'w2').grupoId === null);
+var resCopia2 = copiarGruposDoDiaAnterior(ter);
+verificar('repetir não altera nada (já iguais)', resCopia2.aplicados === 0);
+
 print('— Trabalhador da casa (valor diário próprio) —');
 t.trabalhadores.push({ id: 'w4', nome: 'Dona da Casa', tipo: 'trabalhador', repetido: false, ativo: true, valorDiarioProprio: 50 });
 definirChamada(seg, 'w4', { horas: 8, grupoId: 'g1' });
