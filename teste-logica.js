@@ -155,6 +155,18 @@ verificar('AgriTemp: 8 pessoas-dia × 10€ = 80€',
   custos.linhas[0].pessoasDia === 8 && custos.linhas[0].total === 80);
 verificar('total geral da semana = 80€', custos.totalGeral === 80 && custos.totalPessoasDia === 8);
 
+print('— Custos da temporada inteira —');
+// horas até aqui: Ana 16h (60€/d), Bruno 4h (60€/d), Carlos 16h líder (75€/d), Dona da Casa 8h (50€/d)
+var salTemp = custoSalariosTemporada();
+verificar('salários da temporada: 120 + 30 + 150 + 50 = 350€',
+  salTemp.total === 350 && salTemp.horas === 44 && salTemp.linhas.length === 4);
+var empTemp = custoEmpresasTemporada();
+verificar('empresas da temporada: 8 pessoas-dia × 10€ = 80€',
+  empTemp.total === 80 && empTemp.pessoasDia === 8);
+var kgTemp = totaisProducao(temporada().producao).kg;
+verificar('custo de mão-de-obra por kg = 430 ÷ 1840 ≈ 0,234 €/kg',
+  Math.abs((salTemp.total + empTemp.total) / kgTemp - 0.2337) < 0.001);
+
 print('— Hectares e toneladas por hectare —');
 verificar('hectares do Pomar da Eira = 2', hectaresDoPomarPorNome('Pomar da Eira') === 2);
 verificar('1000 kg em 2 ha = 0,5 t/ha', tonPorHectare(1000, 2) === 0.5);

@@ -148,12 +148,19 @@
           '<button class="btn" id="exp-empresas">📥 Descarregar custos de empresas</button></div>' +
       '</div>' +
 
-      '<div class="cartao"><h3>📄 Resumo diário (PDF)</h3>' +
-        '<p>Presenças do dia (diretos e empresas), produção por grupo com média de kg por pessoa, ' +
-        'totais por variedade e stock de palotes após o dia.</p>' +
-        '<div class="linha-form">' +
-          '<div class="campo"><label>Dia</label><input type="date" id="pdf-data" value="' + hojeISO() + '"></div>' +
-          '<button class="btn" id="exp-pdf">📥 Descarregar resumo do dia</button>' +
+      '<div class="grelha grelha-2">' +
+        '<div class="cartao"><h3>📄 Resumo diário (PDF)</h3>' +
+          '<p>Presenças do dia (diretos e empresas), produção por grupo com média de kg por pessoa, ' +
+          'totais por variedade e stock de palotes após o dia.</p>' +
+          '<div class="linha-form">' +
+            '<div class="campo"><label>Dia</label><input type="date" id="pdf-data" value="' + hojeISO() + '"></div>' +
+            '<button class="btn" id="exp-pdf">📥 Descarregar resumo do dia</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="cartao"><h3>📕 Relatório de fim de temporada (PDF)</h3>' +
+          '<p>Documento único da temporada ' + esc(temporada().ano) + ': produção por variedade e por pomar com t/ha, ' +
+          'custos de salários e de empresas externas, custo de mão-de-obra por kg e comparação com anos anteriores.</p>' +
+          '<button class="btn" id="exp-relatorio-temporada">📥 Descarregar relatório da temporada</button>' +
         '</div>' +
       '</div>';
 
@@ -172,6 +179,9 @@
     el.querySelector('#exp-pdf').addEventListener('click', function(){
       const data = el.querySelector('#pdf-data').value || hojeISO();
       gerarResumoDiarioPDF(data);
+    });
+    el.querySelector('#exp-relatorio-temporada').addEventListener('click', function(){
+      gerarRelatorioTemporadaPDF();
     });
   }
 

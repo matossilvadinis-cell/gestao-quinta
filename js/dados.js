@@ -496,6 +496,48 @@ function custosEmpresasSemana(inicio){
   return { linhas: linhas, totalGeral: totalGeral, totalPessoasDia: totalPessoasDia };
 }
 
+/* ===== Custos da temporada inteira (para o relatório final) ===== */
+
+function custoSalariosTemporada(){
+  const t = temporada();
+  const linhas = [];
+  let total = 0, horas = 0;
+  t.trabalhadores.forEach(function(tr){
+    const h = horasTemporadaTrabalhador(tr.id);
+    if (h <= 0) return;
+    const valorDia = valorDiarioDoTrabalhador(tr);
+    const tot = h / HORAS_DIA_COMPLETO * valorDia;
+    linhas.push({ trabalhador: tr, horas: h, dias: h / HORAS_DIA_COMPLETO, valorDia: valorDia, total: tot });
+    total += tot;
+    horas += h;
+  });
+  linhas.sort(function(a, b){
+    if (a.trabalhador.tipo !== b.trabalhador.tipo) return a.trabalhador.tipo === 'lider' ? -1 : 1;
+    return a.trabalhador.nome.localeCompare(b.trabalhador.nome, 'pt');
+  });
+  return { linhas: linhas, total: total, horas: horas };
+}
+
+function custoEmpresasTemporada(){
+  const t = temporada();
+  const linhas = [];
+  let total = 0, pessoasDia = 0;
+  t.empresas.forEach(function(emp){
+    let pd = 0;
+    Object.keys(t.registoEmpresas).forEach(function(d){
+      pd += parseInt(t.registoEmpresas[d][emp.id], 10) || 0;
+    });
+    if (pd <= 0) return;
+    const valor = Number(emp.valorPorPessoaDia) || 0;
+    const tot = pd * valor;
+    linhas.push({ empresa: emp, pessoasDia: pd, valor: valor, total: tot });
+    total += tot;
+    pessoasDia += pd;
+  });
+  linhas.sort(function(a, b){ return a.empresa.nome.localeCompare(b.empresa.nome, 'pt'); });
+  return { linhas: linhas, total: total, pessoasDia: pessoasDia };
+}
+
 /* ===== Hectares e produtividade por pomar ===== */
 
 // Hectares de um pomar pelo nome (procura na temporada atual e depois nas outras)
